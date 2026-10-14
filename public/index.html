@@ -134,42 +134,6 @@
         max-width: 620px;
       }
 
-      .cta-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 14px;
-        margin-top: 28px;
-      }
-
-      .button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 46px;
-        padding: 0 18px;
-        border-radius: 12px;
-        border: 1px solid transparent;
-        text-decoration: none;
-        font-weight: 700;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-      }
-
-      .button:hover {
-        transform: translateY(-1px);
-      }
-
-      .button.primary {
-        background: linear-gradient(135deg, var(--primary), #6e8efb);
-        color: white;
-        box-shadow: 0 12px 26px rgba(42, 93, 215, 0.18);
-      }
-
-      .button.secondary {
-        background: white;
-        border-color: var(--line);
-        color: var(--ink);
-      }
-
       .hero-card {
         background: var(--panel);
         border: 1px solid rgba(129, 145, 180, 0.2);
@@ -235,13 +199,13 @@
         color: var(--muted);
       }
 
-      .card-grid {
+      .event-links-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 22px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
       }
 
-      .feature {
+      .event-link-card {
         background: rgba(255,255,255,0.72);
         border: 1px solid rgba(142, 158, 188, 0.18);
         border-radius: 20px;
@@ -249,26 +213,36 @@
         box-shadow: 0 12px 24px rgba(36, 51, 78, 0.04);
       }
 
-      .feature-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, #e9f0ff, #f3f7ff);
-        display: grid;
-        place-items: center;
-        font-size: 1.2rem;
-        margin-bottom: 16px;
-      }
-
-      .feature h3 {
+      .event-link-card h3 {
         margin: 0 0 10px;
         font-size: 1.2rem;
       }
 
-      .feature p {
-        margin: 0;
+      .event-link-desc {
+        margin: 0 0 18px;
         color: var(--muted);
         line-height: 1.7;
+      }
+
+      .event-link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background: linear-gradient(135deg, var(--primary), #6e8efb);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 700;
+        box-shadow: 0 10px 22px rgba(42, 93, 215, 0.2);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .event-link-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 28px rgba(42, 93, 215, 0.24);
       }
 
       .footer {
@@ -279,7 +253,7 @@
 
       @media (max-width: 820px) {
         .hero-grid,
-        .card-grid {
+        .event-links-grid {
           grid-template-columns: 1fr;
         }
 
@@ -301,8 +275,6 @@
           <span>Event Displays</span>
         </div>
         <nav class="nav-links" aria-label="Main navigation">
-          <a href="#overview">Overview</a>
-          <a href="#features">Features</a>
           <a href="#links">Links</a>
         </nav>
       </div>
@@ -315,13 +287,9 @@
             <div class="eyebrow">Experiments • Event Displays</div>
             <h1>Event Displays</h1>
             <p class="lead">
-              A lightweight gallery for interactive event displays.
-              HTML pages go under <strong>/public</strong> and should be linked here.
+              Direct links to individual event displays.  <br>
+              Open each display in a new browser tab.
             </p>
-            <div class="cta-row">
-              <!-- <a class="button primary" href="#features">Explore the collection</a> -->
-              <a class="button primary" href="#links">See links below</a>
-            </div>
           </div>
 
           <aside class="hero-card" aria-label="Summary">
@@ -348,45 +316,25 @@
         </div>
       </section>
 
-      <section id="features" class="section">
-        <div class="container">
-          <div class="section-header">
-            <h2>Simple...</h2>
-            <p>Simple and quick publishing</p>
-          </div>
-
-          <div class="card-grid">
-            <article class="feature">
-              <div class="feature-icon">⚡</div>
-              <h3>Fast to publish</h3>
-              <p>Each page is plain HTML, so it loads quickly and works well with GitHub Pages without a build step.</p>
-            </article>
-
-            <article class="feature">
-              <div class="feature-icon">🧩</div>
-              <h3>Easy to expand</h3>
-              <p>Add new pages under <code>/public</code> and link them from the homepage whenever you want to showcase more work.</p>
-            </article>
-
-            <article class="feature">
-              <div class="feature-icon">🎨</div>
-              <h3>Clean presentation</h3>
-              <p>The layout is somewhat polished.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
       <section id="links" class="section">
         <div class="container">
           <div class="section-header">
-            <h2>Links</h2>
-            <p>These links will direct you to the individual ED pages</p>
+            <h2>EDs links</h2>
+            <p>Open each event display in a new browser tab.</p>
           </div>
 
-          <div class="feature">
-            <p><a href="/visual-eds/alice-pbpb-standalone.html">ALICE Pb-Pb Toy MC</a></p>
-            <p><a href="/visual-eds/epic-dis-standalone.html">EPIC DIS Toy MC</a></p>
+          <div class="event-links-grid">
+            <div class="event-link-card">
+              <h3>ALICE Pb-Pb Toy MC</h3>
+              <p class="event-link-desc">Pb-Pb Toy MC collisions as seen by the ALICE detector at the LHC. Made with experiment specs / docs + claude.</p>
+              <a class="event-link-button" href="/visual-eds/alice-pbpb-standalone.html" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+            </div>
+
+            <div class="event-link-card">
+              <h3>ePIC DIS Toy MC</h3>
+              <p class="event-link-desc">DIS at the EIC as seen by the ePIC detector. Made with experiment specs / docs + claude.</p>
+              <a class="event-link-button" href="/visual-eds/epic-dis-standalone.html" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+            </div>
           </div>
         </div>
       </section>
