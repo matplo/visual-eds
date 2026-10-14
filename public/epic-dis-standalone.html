@@ -1027,6 +1027,7 @@ function newEvent() {
   recolor();
   evNo++;
   simT = -1.7; lastPhase = -1;
+  uT.value = (simT - T0) * V_TRK;   // reset the reveal clock immediately as well
   stats();
 }
 
@@ -1157,7 +1158,7 @@ function stats() {
   $('sZDC').textContent = ev.eZDC.toFixed(0);
 }
 
-function replay() { simT = -1.7; lastPhase = -1; }
+function replay() { simT = -1.7; lastPhase = -1; uT.value = (simT - T0) * V_TRK; }
 
 /* ---------------- legend ---------------- */
 const hexOf = c => '#' + c.getHexString(THREE.SRGBColorSpace);
@@ -1311,10 +1312,10 @@ renderer.setAnimationLoop(() => {
     const slow = 0.2 + 0.8 * THREE.MathUtils.smoothstep(Math.abs(simT - 0.05), 0.32, 0.6);   // slow motion around the γ* exchange
     simT += dt * speed * slow;
   }
+  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();   // before the clock uniforms, so a new event never renders with the old event's time
   updateBeams(simT);
   uT.value = (simT - T0) * V_TRK;
   phaseUpdate(simT);
-  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();
   if (tween) {
     tween.t = Math.min(1, tween.t + dt / 0.9);
     const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
