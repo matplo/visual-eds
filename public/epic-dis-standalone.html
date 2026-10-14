@@ -1,0 +1,1380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ePIC DIS Event Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGPU event display; glass HUD top-left, legend top-right, control rail at the bottom. Single dark theme (event-display convention). */
+:root{
+  color-scheme: dark;
+  --void:#060a13;
+  --panel:rgba(9,15,28,.74);
+  --ink:#dfe6f3;
+  --muted:#8796b1;
+  --line:rgba(140,165,205,.20);
+  --amber:#ffb24a;
+  --steel:#6f8db8;
+  --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+body{margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:12px}
+#app{position:fixed;inset:0}
+#app canvas{display:block;width:100%;height:100%;touch-action:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.lbl b{color:var(--ink);font-weight:500}
+.lbl.beamlbl{color:var(--amber);border-bottom-color:var(--amber);text-transform:none}
+.lbl.elbl{color:#9fe8ff;border-bottom-color:#9fe8ff;text-transform:none}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#hud{top:calc(16px + env(safe-area-inset-top,0px));left:16px;width:min(340px,calc(100% - 32px));padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 150px);overflow:auto}
+.eyebrow{font:500 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--amber)}
+h1{margin:0;font:600 30px/1 var(--display);letter-spacing:.01em;text-wrap:balance}
+#hudToggle{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;border-radius:3px}
+#hudToggle:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.chev{font-size:16px;color:var(--muted);transition:transform .2s}
+#hud.collapsed .chev{transform:rotate(-90deg)}
+.hud-body{display:flex;flex-direction:column;gap:10px}
+#hud.collapsed .hud-body,#hud.collapsed details{display:none}
+.beam{color:var(--muted);font-size:11px;line-height:1.45}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;margin:0}
+.stats div{min-width:0}
+.stats dt{font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.stats dd{margin:2px 0 0;font:600 19px/1.1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.phase{border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:3px}
+#phaseName{font:600 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+#phaseNote{color:var(--muted);font-size:11px;line-height:1.45}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;color:var(--muted);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+summary:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+details p,details li{color:var(--muted);font-size:10.5px;line-height:1.5;margin:6px 0 0}
+details ul{margin:4px 0 0;padding-left:16px}
+details i{color:var(--ink);font-style:normal}
+details a{color:var(--ink)}
+#legend{top:calc(16px + env(safe-area-inset-top,0px));right:16px;padding:10px 12px;width:220px}
+#legend h2{margin:0 0 8px;font:500 10.5px/1.2 var(--mono);letter-spacing:.03em;color:var(--muted)}
+#legend h2.sub{margin-top:12px}
+#legend .keys{margin-top:6px}
+.ramp{height:8px;border-radius:2px}
+.ticks{position:relative;height:14px;margin-top:4px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.ticks span:first-child{transform:none}
+.ticks span:last-child{transform:translateX(-100%)}
+.keys{display:flex;flex-wrap:wrap;gap:6px 12px}
+.key{display:flex;align-items:center;gap:6px}
+.key i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.key.muted{color:var(--muted)}
+.zoom output{min-width:19ch}
+#controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grp>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:rgba(120,150,200,.10);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
+select option{background:#0d1526}
+button:hover,select:hover{border-color:var(--steel)}
+button.primary{background:var(--amber);color:#1a1205;border-color:var(--amber);font-weight:600}
+button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+input[type=range]{accent-color:var(--amber);width:110px}
+output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
+label.chk{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--ink)}
+input[type=checkbox]{accent-color:var(--amber)}
+#fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-inline:16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+@media (max-width:720px){
+  #legend{display:none}
+  #hud{padding:10px 12px;gap:7px}
+  h1{font-size:22px}
+  .stats dd{font-size:16px}
+  .hide-sm{display:none}
+  #controls{gap:8px 12px}
+  input[type=range]{width:90px}
+}
+@media (max-height:620px){ details{display:none} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="labels"></div>
+
+  <section class="panel collapsed" id="hud" aria-label="Event summary">
+    <div class="eyebrow">EIC · ePIC · NC DIS · toy MC</div>
+    <h1><button id="hudToggle" type="button" aria-expanded="false" aria-controls="hudBody">ePIC Event Display<span class="chev" aria-hidden="true">▾</span></button></h1>
+    <div id="hudBody" class="hud-body">
+    <div class="beam" id="beamLine">—</div>
+    <dl class="stats">
+      <div><dt>Event</dt><dd id="sEv">—</dd></div>
+      <div><dt>x</dt><dd id="sX">—</dd></div>
+      <div><dt>Q² (GeV²)</dt><dd id="sQ2">—</dd></div>
+      <div><dt>y</dt><dd id="sY">—</dd></div>
+      <div><dt>W (GeV)</dt><dd id="sW">—</dd></div>
+      <div class="hide-sm"><dt>√s (GeV)</dt><dd id="sS">—</dd></div>
+      <div><dt>E′<sub>e</sub> (GeV)</dt><dd id="sEe">—</dd></div>
+      <div class="hide-sm"><dt>θ<sub>e</sub> (deg)</dt><dd id="sTh">—</dd></div>
+      <div><dt>η<sub>e</sub></dt><dd id="sEta">—</dd></div>
+      <div><dt>Tracks</dt><dd id="sNch">—</dd></div>
+      <div><dt>Towers &gt;50 MeV</dt><dd id="sTw">—</dd></div>
+      <div><dt>ΣE cal (GeV)</dt><dd id="sSE">—</dd></div>
+      <div class="hide-sm"><dt>γ in ECal</dt><dd id="sNg">—</dd></div>
+      <div class="hide-sm"><dt>Far-forward</dt><dd id="sFF">—</dd></div>
+      <div class="hide-sm"><dt>E ZDC (GeV)</dt><dd id="sZDC">—</dd></div>
+    </dl>
+    </div>
+    <div class="phase" aria-live="polite">
+      <span id="phaseName">Loading</span>
+      <span id="phaseNote">Initialising the renderer…</span>
+    </div>
+    <details>
+      <summary>Model &amp; references</summary>
+      <ul>
+        <li><i>Machine</i>: e⁻ 5–18 GeV on p 41–275 GeV or Au up to 110 GeV/u; 25 mrad crossing angle, hadrons → +z (forward), electrons → −z (backward). EIC CDR, BNL-221006-2021-FORE (2021); <a href="https://www.bnl.gov/eic/machine.php" target="_blank" rel="noopener">BNL EIC machine page</a>.</li>
+        <li><i>DIS kinematics</i>: Q² = −q², x = Q²/2P·q, y = P·q/P·k, W² = (P+q)². Events drawn from d²σ/dx dQ² ∝ [1+(1−y)²] F₂/(xQ⁴) (F<sub>L</sub>, γZ neglected), toy F₂ ∝ x<sup>−λ</sup>, λ = 0.048 ln(Q²/Λ²) (cf. H1, PLB 520, 183, 2001). Cuts 0.01 &lt; y &lt; 0.95, W² &gt; 10 GeV².</li>
+        <li><i>Hadronisation</i>: longitudinal phase space in the γ*p centre-of-mass frame (leading baryon + rapidity plateau, ⟨p<sub>T</sub>⟩ ≈ 0.35 GeV, ⟨n⟩ ∝ ln W²), exact 4-momentum conservation; not a Lund string (cf. PYTHIA 8.3, SciPost Phys. Codebases 8, 2022). π⁰, η → γγ.</li>
+        <li><i>e+Au</i>: incoherent DIS on one nucleon (no nuclear PDFs), plus evaporation neutrons → ZDC (zero-degree calorimeter) and protons → OMD (off-momentum detectors).</li>
+        <li><i>Detector</i>: central detector ≈ 9.5 m long, r ≈ 2.67 m, |η| &lt; 3.5; MARCO solenoid 1.7 T, 2.8 m bore (<a href="https://www.epic-eic.org/public/detector.html" target="_blank" rel="noopener">ePIC detector page</a>). SVT = silicon vertex tracker (3 vertex + 2 barrel layers, 5+5 disks); MPGD = micro-pattern gaseous detectors (2 barrel layers, 2+2 disks); AC-LGAD = AC-coupled low-gain avalanche diode TOF; hpDIRC = high-performance DIRC; pfRICH = proximity-focusing RICH; dRICH = dual-radiator RICH. Calorimeters: EEEMCal (PbWO₄, backward), BIC (barrel imaging), FEMC (forward EM), nHCal / BHCal / LFHCAL (backward / barrel / forward hadronic). Positions approximate, after EIC Yellow Report, NPA 1026, 122447 (2022).</li>
+        <li><i>Granularity</i>: EEEMCal 2 cm crystals; BIC drawn Δφ×Δη ≈ 0.049×0.05, FEMC 5 cm (real ≈ 2.5 cm), HCals 10 cm or Δη = Δφ ≈ 0.1. Tower height ∝ ln(1 + E/50 MeV).</li>
+        <li><i>Far forward</i>: B0 (z ≈ 6 m), OMD (≈ 22.5 m), Roman pots (≈ 26–28 m), ZDC (≈ 35.8 m). Drawn as straight lines (dipole bending not simulated), path compressed ×0.15 beyond z = 4.5 m. Kinematics generated head-on; hadronic final state rotated by the crossing angle (approximation).</li>
+        <li><i>Scale</i>: hadrons drawn at true size by default; the Hadron zoom slider magnifies the proton (R ≈ 0.84 fm) or Au (R ≈ 6.4 fm), the γ* exchange and the colour string. Lorentz contraction drawn at γ = 12.</li>
+      </ul>
+    </details>
+  </section>
+
+  <aside class="panel" id="legend" aria-label="Colour legend"></aside>
+
+  <section class="panel" id="controls" aria-label="Controls">
+    <div class="grp">
+      <button id="bNext" class="primary">New event</button>
+      <button id="bReplay">Replay</button>
+      <button id="bPause" aria-pressed="false">Pause</button>
+      <button id="bShot" hidden>Save screenshot</button>
+    </div>
+    <div class="grp">
+      <span>Beams</span>
+      <select id="iBeam" aria-label="Beam configuration">
+        <option value="ep275">e+p 18×275</option>
+        <option value="ep100">e+p 10×100</option>
+        <option value="ep41">e+p 5×41</option>
+        <option value="au110">e+Au 18×110</option>
+        <option value="au100">e+Au 10×100</option>
+        <option value="au41">e+Au 5×41</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>Q² min</span>
+      <input id="iQ2" type="range" min="0" max="3" step="0.05" value="0.5" aria-label="Minimum Q squared, log10 GeV squared">
+      <output id="oQ2">3.2 GeV²</output>
+    </div>
+    <div class="grp">
+      <span>Colour</span>
+      <select id="iColor" aria-label="Track colour mode">
+        <option value="pt">pT</option>
+        <option value="charge">Charge</option>
+        <option value="species">Species</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>View</span>
+      <button id="v3d" aria-pressed="true">3D</button>
+      <button id="vBeam" aria-pressed="false">Beam axis</button>
+      <button id="vSide" aria-pressed="false">Side</button>
+      <button id="vFar" aria-pressed="false">Far fwd</button>
+    </div>
+    <div class="grp zoom">
+      <span>Hadron zoom</span>
+      <input id="iZoom" type="range" min="0" max="14.6" step="0.01" value="0" aria-label="Hadron magnification, log10 scale">
+      <output id="oZoom">1× (true size)</output>
+    </div>
+    <div class="grp">
+      <span>Speed</span>
+      <input id="iSpeed" type="range" min="0.2" max="10" step="0.1" value="3" aria-label="Playback speed">
+      <output id="oSpeed">3.0×</output>
+    </div>
+    <div class="grp">
+      <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
+      <label class="chk"><input id="cQax" type="checkbox" checked>Quark axis</label>
+      <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
+      <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
+  </section>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.tsl.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three/webgpu';
+import { uniform, attribute, float, vec3, color, mix, step, smoothstep, exp, abs, dot, fract, fwidth, min, max,
+         positionLocal, normalView, positionViewDirection, mx_noise_float, time, pass } from 'three/tsl';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+/* ==== PHYSICS BEGIN ==== (pure JS, no three.js: DIS generator, tracking, calorimeter response) */
+const PHYS = (() => {
+  const MP = 0.938272, MN = 0.939565, THC = 0.025, TWO_PI = 2 * Math.PI;
+  const rnd = Math.random;
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(TWO_PI * rnd());
+  const poisson = mu => { const L = Math.exp(-mu); let k = 0, p = 1; do { k++; p *= rnd(); } while (p > L && k < 300); return k - 1; };
+
+  const BEAMS = {
+    ep275: { Ee: 18, Ep: 275, A: 1, Z: 1, ion: 'p' },
+    ep100: { Ee: 10, Ep: 100, A: 1, Z: 1, ion: 'p' },
+    ep41:  { Ee: 5,  Ep: 41,  A: 1, Z: 1, ion: 'p' },
+    au110: { Ee: 18, Ep: 110, A: 197, Z: 79, ion: 'Au' },
+    au100: { Ee: 10, Ep: 100, A: 197, Z: 79, ion: 'Au' },
+    au41:  { Ee: 5,  Ep: 41,  A: 197, Z: 79, ion: 'Au' },
+  };
+  const SPC = {
+    'e-':   { name: 'e⁻', m: 0.000511, q: -1, cls: 'lep', grp: 'e' },
+    'pi+':  { name: 'π⁺', m: 0.13957,  q: 1,  cls: 'had', grp: 'pi' },
+    'pi-':  { name: 'π⁻', m: 0.13957,  q: -1, cls: 'had', grp: 'pi' },
+    'pi0':  { name: 'π⁰', m: 0.134977, q: 0,  cls: 'dec' },
+    'eta':  { name: 'η',  m: 0.547862, q: 0,  cls: 'dec' },
+    'K+':   { name: 'K⁺', m: 0.493677, q: 1,  cls: 'had', grp: 'K' },
+    'K-':   { name: 'K⁻', m: 0.493677, q: -1, cls: 'had', grp: 'K' },
+    'K0L':  { name: 'K⁰L', m: 0.497611, q: 0, cls: 'neu' },
+    'p':    { name: 'p',  m: MP, q: 1,  cls: 'had', grp: 'p', baryon: 1 },
+    'pbar': { name: 'p̄',  m: MP, q: -1, cls: 'had', grp: 'p', baryon: -1 },
+    'n':    { name: 'n',  m: MN, q: 0,  cls: 'neu', baryon: 1 },
+    'gamma':{ name: 'γ',  m: 0,  q: 0,  cls: 'gam' },
+  };
+  const MESONS = [['pi+', .26], ['pi-', .26], ['pi0', .26], ['K+', .05], ['K-', .05], ['K0L', .05], ['eta', .04], ['p', .015], ['pbar', .015]];
+  const MES_SUM = MESONS.reduce((a, m) => a + m[1], 0);
+  const pickMeson = () => { let u = rnd() * MES_SUM; for (const [k, f] of MESONS) if ((u -= f) < 0) return k; return 'pi0'; };
+
+  /* ---- geometry (metres; approximate ePIC layout) ---- */
+  const BARREL = [            // r, zmin, zmax, system
+    [0.036, -0.135, 0.135, 'SVT'], [0.048, -0.135, 0.135, 'SVT'], [0.120, -0.135, 0.135, 'SVT'],
+    [0.270, -0.27, 0.27, 'SVT'], [0.420, -0.42, 0.42, 'SVT'],
+    [0.550, -1.05, 1.43, 'MPGD'], [0.640, -1.20, 1.40, 'TOF'], [0.720, -1.60, 1.60, 'MPGD'],
+  ];
+  const DISKS = [             // z, rmin, rmax, system
+    ...[-0.25, -0.45, -0.65, -0.85, -1.05].map(z => [z, 0.036 + 0.03 * -z, -z < 0.5 ? 0.24 : 0.43, 'SVT']),
+    ...[0.25, 0.45, 0.70, 1.00, 1.35].map(z => [z, 0.036 + 0.045 * z, z < 0.5 ? 0.24 : 0.43, 'SVT']),
+    [-1.08, 0.07, 0.50, 'MPGD'], [-1.14, 0.07, 0.50, 'MPGD'], [1.45, 0.10, 0.50, 'MPGD'], [1.55, 0.10, 0.50, 'MPGD'],
+    [1.87, 0.10, 0.60, 'TOF'],
+  ];
+  const HIT_SC = { SVT: 0.006, MPGD: 0.011, TOF: 0.011 };
+  const R_STOP = 0.80, Z_BACK = -1.70, Z_FWD = 3.55, B0T = 1.7;
+  const bfield = z => { const a = Math.abs(z); return B0T * (a < 1.7 ? 1 : a > 2.6 ? 0 : 0.5 * (1 + Math.cos(Math.PI * (a - 1.7) / 0.9))); };
+
+  const CALS = []; let base = 0;
+  const addCal = c => {
+    if (c.type === 'endcap') { c.cx = c.cx || 0; c.n = Math.round(2 * c.half / c.cell); c.ncell = c.n * c.n; }
+    else { c.dphi = TWO_PI / c.nphi; c.neta = Math.round((c.eta1 - c.eta0) / c.deta); c.ncell = c.nphi * c.neta; }
+    c.base = base; base += c.ncell; CALS.push(c); return c;
+  };
+  addCal({ name: 'EEEMCal', kind: 'ecal', type: 'endcap', z: -1.74, dir: -1, half: 0.62, cell: 0.02, rmin: 0.07, rmax: 0.62, depth: 0.20, res: [0.02, 0.01] });
+  addCal({ name: 'BIC',     kind: 'ecal', type: 'barrel', R: 0.82, eta0: -1.7, eta1: 1.3, nphi: 128, deta: 0.05, depth: 0.35, res: [0.055, 0.01] });
+  addCal({ name: 'FEMC',    kind: 'ecal', type: 'endcap', z: 3.60, dir: 1, half: 1.85, cell: 0.05, rmin: 0.18, rmax: 1.85, depth: 0.30, res: [0.10, 0.02] });
+  addCal({ name: 'nHCal',   kind: 'hcal', type: 'endcap', z: -3.30, dir: -1, half: 2.2, cell: 0.10, rmin: 0.12, rmax: 2.2, depth: 0.80, res: [0.50, 0.10] });
+  addCal({ name: 'BHCal',   kind: 'hcal', type: 'barrel', R: 1.90, eta0: -1.2, eta1: 1.2, nphi: 64, deta: 0.1, depth: 0.80, res: [0.75, 0.15] });
+  addCal({ name: 'LFHCAL',  kind: 'hcal', type: 'endcap', z: 3.80, dir: 1, half: 2.6, cell: 0.10, rmin: 0.18, rmax: 2.6, depth: 1.20, res: [0.45, 0.10] });
+  addCal({ name: 'ZDC',     kind: 'zdc',  type: 'endcap', z: 35.8, cx: -Math.sin(THC) * 35.8, dir: 1, half: 0.3, cell: 0.1, rmin: 0, rmax: 1, depth: 1.0, res: [0.50, 0.05] });
+  const NCELL = base;
+  const ECALS = CALS.filter(c => c.kind === 'ecal'), HCALS = CALS.filter(c => c.kind === 'hcal'), ZDC = CALS.find(c => c.kind === 'zdc');
+  const FF = { B0: 6.6, OMD: 22.5, RP: 27.0, ZDC: 35.8, LOWQ2: -24, Z_COMP: 4.5, K: 0.15 };
+
+  /* ---- shared buffers ---- */
+  const MAXTRK = 700, MAXSEG = 170, MAXV = MAXTRK * MAXSEG * 2, MAXH = MAXTRK * 16, MAXD = 6000;
+  const G = {
+    tPos: new Float32Array(MAXV * 3), tPath: new Float32Array(MAXV),
+    hPos: new Float32Array(MAXH * 3), hT: new Float32Array(MAXH), hS: new Float32Array(MAXH),
+    dPos: new Float32Array(MAXD * 3), dPath: new Float32Array(MAXD), dKind: new Float32Array(MAXD),
+    towE: new Float32Array(NCELL), towT: new Float32Array(NCELL),
+    nv: 0, nh: 0, nd: 0, vz: 0, maxPath: 0,
+  };
+  function addSeg(x0, y0, z0, s0, x1, y1, z1, s1) {
+    if (G.nv + 2 > MAXV) return false;
+    const o = G.nv * 3;
+    G.tPos[o] = x0; G.tPos[o + 1] = y0; G.tPos[o + 2] = z0; G.tPath[G.nv] = s0;
+    G.tPos[o + 3] = x1; G.tPos[o + 4] = y1; G.tPos[o + 5] = z1; G.tPath[G.nv + 1] = s1;
+    G.nv += 2; return true;
+  }
+  function addHit(x, y, z, t, sc) {
+    if (G.nh >= MAXH) return false;
+    const o = G.nh * 3; G.hPos[o] = x; G.hPos[o + 1] = y; G.hPos[o + 2] = z; G.hT[G.nh] = t; G.hS[G.nh] = sc; G.nh++; return true;
+  }
+  function addDash(a, b, s0, s1, kind) {
+    if (G.nd + 2 > MAXD) return false;
+    const o = G.nd * 3;
+    G.dPos.set(a, o); G.dPos.set(b, o + 3); G.dPath[G.nd] = s0; G.dPath[G.nd + 1] = s1; G.dKind[G.nd] = G.dKind[G.nd + 1] = kind;
+    G.nd += 2; return true;
+  }
+
+  /* ---- 4-vectors ---- */
+  function boost(p, bx, by, bz) {          // rest frame → frame where it moves with β
+    const b2 = bx * bx + by * by + bz * bz; if (b2 < 1e-16) return p.slice();
+    const g = 1 / Math.sqrt(1 - b2), bp = bx * p[1] + by * p[2] + bz * p[3], g2 = (g - 1) / b2;
+    return [g * (p[0] + bp), p[1] + g2 * bp * bx + g * bx * p[0], p[2] + g2 * bp * by + g * by * p[0], p[3] + g2 * bp * bz + g * bz * p[0]];
+  }
+  const cC = Math.cos(THC), sC = Math.sin(THC);
+  const rotC = p => [p[0], p[1] * cC - p[3] * sC, p[2], p[1] * sC + p[3] * cC];   // 4-vector; +z → hadron axis (−sinθc, 0, cosθc)
+  const HAX = [-sC, 0, cC];
+  function decayGG(m, E, px, py, pz) {
+    const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = TWO_PI * rnd(), e = m / 2;
+    const bx = px / E, by = py / E, bz = pz / E, b2 = bx * bx + by * by + bz * bz, g = E / m;
+    const out = [];
+    for (const s of [1, -1]) {
+      const qx = s * e * st * Math.cos(ph), qy = s * e * st * Math.sin(ph), qz = s * e * ct;
+      const bq = bx * qx + by * qy + bz * qz, k = b2 > 1e-12 ? (g - 1) * bq / b2 + g * e : g * e;
+      out.push([g * (e + bq), qx + k * bx, qy + k * by, qz + k * bz]);
+    }
+    return out;
+  }
+
+  /* ---- DIS sampling ---- */
+  const YMIN = 0.01, YMAX = 0.95, LNY = Math.log(YMAX / YMIN);
+  const f2 = (x, Q2) => { const lam = 0.048 * Math.log(Math.max(Q2, 0.2) / 0.085); return (0.18 * Math.pow(x, -lam) + 1.1 * Math.pow(x, 0.7)) * Math.pow(1 - x, 3); };
+  const WCACHE = new Map();
+  function wmax(s, q2lo, Q2max) {
+    const key = s + ':' + q2lo; if (WCACHE.has(key)) return WCACHE.get(key);
+    let m = 0;
+    for (let i = 0; i <= 40; i++) {
+      const Q2 = q2lo * Math.pow(Q2max / q2lo, i / 40), xlo = Q2 / (s * YMAX), xhi = Math.min(1, Q2 / (s * YMIN));
+      if (xlo >= xhi) continue;
+      for (let j = 0; j <= 60; j++) { const x = xlo * Math.pow(xhi / xlo, j / 60); m = Math.max(m, f2(x, Q2) * Math.log(xhi / xlo) / LNY); }
+    }
+    m *= 1.15; WCACHE.set(key, m); return m;
+  }
+  function sampleDIS(Ee, Ep, q2min) {
+    const s = 4 * Ee * Ep, Q2max = s * YMAX * 0.999, q2lo = Math.min(q2min, 0.3 * Q2max), wm = wmax(s, q2lo, Q2max);
+    for (let it = 0; it < 200000; it++) {
+      const Q2 = 1 / (1 / q2lo - rnd() * (1 / q2lo - 1 / Q2max));          // ∝ 1/Q⁴
+      const xlo = Q2 / (s * YMAX), xhi = Math.min(1, Q2 / (s * YMIN)); if (xlo >= xhi) continue;
+      const x = xlo * Math.pow(xhi / xlo, rnd()), y = Q2 / (s * x);
+      const w = 0.5 * (1 + (1 - y) * (1 - y)) * f2(x, Q2) * Math.log(xhi / xlo) / LNY / wm;
+      if (rnd() < w) return { x, Q2, y, s };
+    }
+    return null;
+  }
+
+  /* ---- toy hadronisation in the γ*p CM frame (+z' = γ* direction) ---- */
+  function hadronize(W, lead) {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const Y = Math.log(W / 0.4), list = [];
+      const pT = () => -0.175 * Math.log((rnd() + 1e-9) * (rnd() + 1e-9));
+      const add = (sp, y) => { const m = SPC[sp].m, pt = pT(), ph = TWO_PI * rnd(), mT = Math.hypot(m, pt); list.push({ sp, m, v: [mT * Math.cosh(y), pt * Math.cos(ph), pt * Math.sin(ph), mT * Math.sinh(y)] }); };
+      add(lead, -Y * (0.7 + 0.25 * rnd()));                // target-remnant leading baryon
+      add(pickMeson(), Y * (0.65 + 0.3 * rnd()));          // current-jet leading hadron
+      const n = poisson(Math.max(0.3, 1.8 * Math.log(W * W) - 2.5));
+      for (let i = 0; i < n; i++) add(pickMeson(), -Y + 0.5 + (2 * Y - 0.8) * rnd());
+      const msum = () => list.reduce((a, p) => a + p.m, 0);
+      while (list.length > 2 && msum() > 0.85 * W) list.pop();
+      if (msum() > 0.95 * W) continue;
+      const S = [0, 0, 0, 0]; for (const p of list) for (let j = 0; j < 4; j++) S[j] += p.v[j];
+      for (const p of list) p.v = boost(p.v, -S[1] / S[0], -S[2] / S[0], -S[3] / S[0]);
+      const f = l => list.reduce((a, p) => a + Math.sqrt(p.m * p.m + l * l * (p.v[1] ** 2 + p.v[2] ** 2 + p.v[3] ** 2)), 0) - W;
+      let lo = 0, hi = 1;
+      while (f(hi) < 0 && hi < 1e6) hi *= 2;
+      if (f(hi) < 0) continue;
+      for (let it = 0; it < 60; it++) { const mid = 0.5 * (lo + hi); if (f(mid) < 0) lo = mid; else hi = mid; }
+      const l = 0.5 * (lo + hi);
+      for (const p of list) { p.v[1] *= l; p.v[2] *= l; p.v[3] *= l; p.v[0] = Math.sqrt(p.m * p.m + p.v[1] ** 2 + p.v[2] ** 2 + p.v[3] ** 2); }
+      return list;
+    }
+    return null;
+  }
+
+  /* ---- calorimetry ---- */
+  function hitCal(c, o, d) {
+    if (c.type === 'endcap') {
+      if (Math.abs(d[2]) < 1e-9) return null;
+      const t = (c.z - o[2]) / d[2]; if (t < -1e-3) return null;
+      const x = o[0] + t * d[0], y = o[1] + t * d[1], X = x - c.cx;
+      if (Math.abs(X) >= c.half || Math.abs(y) >= c.half) return null;
+      const r = Math.hypot(X, y); if (r < c.rmin || r > c.rmax) return null;
+      return { c, t, p: [x, y, c.z] };
+    }
+    const a = d[0] * d[0] + d[1] * d[1]; if (a < 1e-12) return null;
+    const b = 2 * (o[0] * d[0] + o[1] * d[1]), cc = o[0] * o[0] + o[1] * o[1] - c.R * c.R, disc = b * b - 4 * a * cc;
+    if (disc < 0) return null;
+    const t = (-b + Math.sqrt(disc)) / (2 * a); if (t < -1e-3) return null;
+    const p = [o[0] + t * d[0], o[1] + t * d[1], o[2] + t * d[2]], eta = Math.asinh(p[2] / c.R);
+    if (eta < c.eta0 || eta >= c.eta1) return null;
+    return { c, t, p };
+  }
+  function firstHit(list, o, d) { let best = null; for (const c of list) { const h = hitCal(c, o, d); if (h && (!best || h.t < best.t)) best = h; } return best; }
+  const smear = (E, r) => Math.max(0, E * (1 + gauss() * Math.sqrt(r[0] * r[0] / Math.max(E, 1e-3) + r[1] * r[1])));
+  function deposit(h, E, tArr, sigma, nS) {
+    if (!(E > 0)) return;
+    const c = h.c, e = E / nS;
+    let u, v, nu, nv;
+    if (c.type === 'endcap') { u = (h.p[0] - c.cx + c.half) / c.cell; v = (h.p[1] + c.half) / c.cell; nu = nv = c.n; }
+    else { const ph = ((Math.atan2(h.p[1], h.p[0]) % TWO_PI) + TWO_PI) % TWO_PI; u = ph / c.dphi; v = (Math.asinh(h.p[2] / c.R) - c.eta0) / c.deta; nu = c.nphi; nv = c.neta; }
+    for (let i = 0; i < nS; i++) {
+      let iu = Math.floor(u + sigma * gauss()); const iv = Math.floor(v + sigma * gauss());
+      if (c.type === 'barrel') iu = ((iu % nu) + nu) % nu;
+      if (iu < 0 || iu >= nu || iv < 0 || iv >= nv) continue;
+      if (c.type === 'endcap') { const r = Math.hypot((iu + 0.5) * c.cell - c.half, (iv + 0.5) * c.cell - c.half); if (r < c.rmin || r > c.rmax) continue; }
+      const id = c.base + iu * nv + iv;
+      if (G.towE[id] === 0 || tArr < G.towT[id]) G.towT[id] = tArr;
+      G.towE[id] += e;
+    }
+  }
+  // ECal (EM shower, MIP or partial hadronic) then HCal behind it; returns the ECal/HCal entry point
+  function calo(par, o, d, s0, off) {
+    const sp = SPC[par.sp], E = par.p[0], em = sp.cls === 'lep' || sp.cls === 'gam';
+    const Eav = sp.baryon === 1 ? E - sp.m : sp.baryon === -1 ? E + sp.m : E;
+    const ec = firstHit(ECALS, o, d);
+    if (ec) {
+      const tA = s0 + ec.t - off;
+      if (em) { deposit(ec, smear(E, ec.c.res), tA, 0.45, 16); return ec; }
+      let ed = 0, mip = false;
+      if (sp.q !== 0 && rnd() < 0.6) { mip = true; ed = Math.min(0.3 * (1 + 0.1 * gauss()), Eav); }
+      else if (sp.q !== 0 || rnd() < 0.35) ed = Eav * (0.1 + 0.5 * rnd());
+      if (ed > 0) deposit(ec, ed, tA, mip ? 0.2 : 0.8, mip ? 3 : 10);
+      const hc = firstHit(HCALS, ec.p, d);
+      if (hc) deposit(hc, smear(Math.max(Eav - ed, 0), hc.c.res), tA + hc.t, 0.6, 14);
+      return ec;
+    }
+    const hc = firstHit(HCALS, o, d);
+    if (hc) { deposit(hc, smear(em ? E : Eav, hc.c.res), s0 + hc.t - off, em ? 0.4 : 0.6, 14); return hc; }
+    return null;
+  }
+
+  /* ---- charged-particle helix in the solenoid (variable Bz), straight beyond ---- */
+  function track(par, off) {
+    const sp = SPC[par.sp], px = par.p[1], py = par.p[2], pz = par.p[3];
+    const pt = Math.hypot(px, py); if (pt < 1e-3) return null;
+    const pp = Math.hypot(pt, pz), ch = pp / pt, tz = pz / pt;
+    const tr = { start: G.nv, count: 0, h0: G.nh, nh: 0, pt, q: sp.q, grp: sp.grp, isE: par.sp === 'e-', eta: Math.asinh(pz / pt) };
+    let x = 0, y = 0, z = G.vz, al = Math.atan2(py, px), s = 0, turned = 0, seg = 0, exited = false;
+    while (seg < MAXSEG - 2) {
+      const r = Math.hypot(x, y), k = 0.3 * bfield(z) / pt;
+      const dzMax = tz < 0 ? (z - Z_BACK) / -tz : tz > 0 ? (Z_FWD - z) / tz : 1;   // land on the stop surfaces, do not overshoot
+      const ds = Math.max(2e-4, Math.min(0.05 / ch, k > 1e-6 ? 0.12 / k : 1, 0.008 + 0.25 * r, R_STOP - r + 0.002, dzMax + 0.002));
+      const da = -sp.q * k * ds, am = al + da / 2;
+      const nx = x + Math.cos(am) * ds, ny = y + Math.sin(am) * ds, nz = z + tz * ds, ns = s + ds * ch;
+      if (!addSeg(x, y, z, s - off, nx, ny, nz, ns - off)) break;
+      seg++;
+      const rn = Math.hypot(nx, ny);
+      for (const [lr, z0, z1, sys] of BARREL) if ((r < lr) !== (rn < lr)) {
+        const f = (lr - r) / (rn - r), hz = z + f * (nz - z);
+        if (hz > z0 && hz < z1 && addHit(x + f * (nx - x), y + f * (ny - y), hz, s + f * (ns - s) - off, HIT_SC[sys])) tr.nh++;
+      }
+      for (const [dz, r0, r1, sys] of DISKS) if ((z < dz) !== (nz < dz)) {
+        const f = (dz - z) / (nz - z), hx = x + f * (nx - x), hy = y + f * (ny - y), hr = Math.hypot(hx, hy);
+        if (hr > r0 && hr < r1 && addHit(hx, hy, dz, s + f * (ns - s) - off, HIT_SC[sys])) tr.nh++;
+      }
+      x = nx; y = ny; z = nz; s = ns; al += da; turned += Math.abs(da);
+      if (rn >= R_STOP || z <= Z_BACK || z >= Z_FWD) { exited = true; break; }
+      if (turned > 2.6 * Math.PI) break;
+    }
+    let end = s;
+    if (exited) {
+      const d = [Math.cos(al) * pt / pp, Math.sin(al) * pt / pp, pz / pp];
+      const h = calo(par, [x, y, z], d, s, off);
+      if (h) { if (h.t > 0.003) addSeg(x, y, z, s - off, h.p[0], h.p[1], h.p[2], s + h.t - off); end = s + h.t; tr.cal = h.c.name; }
+      else if (tr.isE && d[2] < 0) {            // scattered e⁻ inside the backward beam pipe → low-Q² tagger
+        const t = (-4.5 - z) / d[2];
+        addDash([x, y, z], [x + t * d[0], y + t * d[1], -4.5], s - off, s + t - off, 3);
+        end = s + t;
+      }
+    }
+    tr.count = G.nv - tr.start;
+    if (!tr.isE) G.maxPath = Math.max(G.maxPath, end);
+    return tr;
+  }
+  function neutral(par, kind) {
+    const px = par.p[1], py = par.p[2], pz = par.p[3], pp = Math.hypot(px, py, pz); if (pp < 1e-6) return null;
+    const d = [px / pp, py / pp, pz / pp], o = [0, 0, G.vz];
+    const h = calo(par, o, d, 0, 0);
+    if (!h) return null;
+    addDash(o, h.p, 0, h.t, kind); G.maxPath = Math.max(G.maxPath, h.t);
+    return h.c.kind;
+  }
+  function farForward(par, thH, B) {
+    const sp = SPC[par.sp], E = par.p[0], pp = Math.hypot(par.p[1], par.p[2], par.p[3]);
+    const d = [par.p[1] / pp, par.p[2] / pp, par.p[3] / pp], o = [0, 0, G.vz];
+    if (d[2] <= 0) return null;
+    let zEnd, what;
+    if (sp.q === 0 && thH < 0.0045) { zEnd = FF.ZDC; what = 'ZDC'; }
+    else if (sp.q !== 0 && thH > 0.0055 && thH < 0.02) { zEnd = FF.B0; what = 'B0'; }
+    else if (sp.q === 1 && sp.baryon === 1 && thH < 0.005) {
+      const rig = pp / (B.Ep * B.A / B.Z);                  // rigidity relative to the beam
+      if (rig > 0.5 && rig < 0.97) { zEnd = FF.RP; what = 'RP'; }
+      else if (rig > 0.25 && rig <= 0.5) { zEnd = FF.OMD; what = 'OMD'; }
+      else return null;
+    } else return null;
+    const t = (zEnd - o[2]) / d[2], p1 = [o[0] + t * d[0], o[1] + t * d[1], zEnd];
+    const t1 = (FF.Z_COMP - o[2]) / d[2], pm = [o[0] + t1 * d[0], o[1] + t1 * d[1], FF.Z_COMP];
+    const s2 = t1 + (t - t1) * FF.K, kind = sp.cls === 'gam' ? 0 : sp.q === 0 ? 1 : 2;
+    addDash(o, pm, 0, t1, kind); addDash(pm, p1, t1, s2, kind);
+    if (what === 'ZDC') deposit({ c: ZDC, t, p: p1 }, smear(sp.cls === 'gam' ? E : E - (sp.baryon === 1 ? sp.m : 0), ZDC.res), s2, 0.6, 12);
+    else addHit(p1[0], p1[1], p1[2], s2, 0.05);
+    G.maxPath = Math.max(G.maxPath, s2);
+    return what;
+  }
+
+  /* ---- one event ---- */
+  function generate(beamKey, q2min, off) {
+    const B = BEAMS[beamKey];
+    G.nv = G.nh = G.nd = 0; G.towE.fill(0); G.towT.fill(0); G.maxPath = 0;
+    G.vz = 0.03 * gauss();
+    const Pm = [Math.hypot(B.Ep, MP), 0, 0, B.Ep], k = [B.Ee, 0, 0, -B.Ee];
+    let kin = null, kp, q, Ph, W2, thE, Eout, phE;
+    for (let tries = 0; tries < 500; tries++) {
+      kin = sampleDIS(B.Ee, B.Ep, q2min); if (!kin) continue;
+      Eout = B.Ee * (1 - kin.y) + kin.Q2 / (4 * B.Ee);
+      const cth = Math.min(1, Math.max(-1, kin.Q2 / (2 * B.Ee * Eout) - 1));
+      thE = Math.acos(cth); phE = TWO_PI * rnd();
+      kp = [Eout, Eout * Math.sin(thE) * Math.cos(phE), Eout * Math.sin(thE) * Math.sin(phE), Eout * cth];
+      q = k.map((v, i) => v - kp[i]);
+      Ph = Pm.map((v, i) => v + q[i]);
+      W2 = Ph[0] * Ph[0] - Ph[1] * Ph[1] - Ph[2] * Ph[2] - Ph[3] * Ph[3];
+      if (W2 > 10) break;
+    }
+    const W = Math.sqrt(W2);
+    const finals = [{ sp: 'e-', p: kp, had: false }];
+    // struck nucleon and hadronic final state
+    const struckN = B.A > 1 && rnd() > B.Z / B.A;
+    const lead = struckN ? (rnd() < 0.6 ? 'n' : 'p') : (rnd() < 0.6 ? 'p' : 'n');
+    const hs = hadronize(W, lead) || [];
+    const beta = [Ph[1] / Ph[0], Ph[2] / Ph[0], Ph[3] / Ph[0]];
+    const qcm = boost(q, -beta[0], -beta[1], -beta[2]);
+    const qn = Math.hypot(qcm[1], qcm[2], qcm[3]), nz = [qcm[1] / qn, qcm[2] / qn, qcm[3] / qn];
+    const aux = Math.abs(nz[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    let e1 = [aux[1] * nz[2] - aux[2] * nz[1], aux[2] * nz[0] - aux[0] * nz[2], aux[0] * nz[1] - aux[1] * nz[0]];
+    const l1 = Math.hypot(...e1); e1 = e1.map(v => v / l1);
+    const e2 = [nz[1] * e1[2] - nz[2] * e1[1], nz[2] * e1[0] - nz[0] * e1[2], nz[0] * e1[1] - nz[1] * e1[0]];
+    const sumH = [0, 0, 0, 0];
+    for (const h of hs) {
+      const v = h.v, w = [v[0], v[1] * e1[0] + v[2] * e2[0] + v[3] * nz[0], v[1] * e1[1] + v[2] * e2[1] + v[3] * nz[1], v[1] * e1[2] + v[2] * e2[2] + v[3] * nz[2]];
+      const lab = boost(w, beta[0], beta[1], beta[2]);
+      for (let j = 0; j < 4; j++) sumH[j] += lab[j];
+      finals.push({ sp: h.sp, p: rotC(lab), had: true });
+    }
+    // e+Au: evaporation nucleons from the excited residual nucleus
+    let nEvapN = 0, nEvapP = 0;
+    if (B.A > 1) {
+      nEvapN = Math.min(15, Math.floor(-Math.log(rnd() + 1e-9) * 4)); nEvapP = Math.floor(rnd() * 3);
+      for (let i = 0; i < nEvapN + nEvapP; i++) {
+        const sp = i < nEvapN ? 'n' : 'p', m = SPC[sp].m, pzv = B.Ep * (1 + 0.003 * gauss()), pxv = 0.1 * gauss(), pyv = 0.1 * gauss();
+        finals.push({ sp, p: rotC([Math.sqrt(m * m + pxv * pxv + pyv * pyv + pzv * pzv), pxv, pyv, pzv]), had: true });
+      }
+    }
+    // decays π⁰, η → γγ
+    const fin = [];
+    for (const f of finals) {
+      const sp = SPC[f.sp];
+      if (sp.cls === 'dec') { if (rnd() < (f.sp === 'pi0' ? 0.988 : 0.394)) for (const g of decayGG(sp.m, ...f.p)) fin.push({ sp: 'gamma', p: g, had: true }); }
+      else fin.push(f);
+    }
+    // struck-quark direction (quark–parton model): p_q' = xP + q
+    const dqv = rotC([0, q[1], q[2], kin.x * B.Ep + q[3]]), dql = Math.hypot(dqv[1], dqv[2], dqv[3]);
+    const dq = [dqv[1] / dql, dqv[2] / dql, dqv[3] / dql];
+    addDash([0, 0, G.vz], [3.2 * dq[0], 3.2 * dq[1], G.vz + 3.2 * dq[2]], -off, 3.2 - off, 4);
+
+    const trks = [], ff = { ZDC: 0, B0: 0, RP: 0, OMD: 0, beam: 0 };
+    let nG = 0, nNeu = 0;
+    for (const f of fin) {
+      const sp = SPC[f.sp], pp = Math.hypot(f.p[1], f.p[2], f.p[3]);
+      const thH = f.had ? Math.acos(Math.min(1, (f.p[1] * HAX[0] + f.p[3] * HAX[2]) / pp)) : Math.PI;
+      if (thH < 0.035) { const w = farForward(f, thH, B); if (w) ff[w]++; else ff.beam++; continue; }
+      if (sp.q !== 0) { const tr = track(f, f.sp === 'e-' ? off : 0); if (tr) trks.push(tr); }
+      else { const r = neutral(f, sp.cls === 'gam' ? 0 : 1); if (r && sp.cls === 'gam' && r === 'ecal') nG++; if (r && sp.cls !== 'gam') nNeu++; }
+    }
+    let eZDC = 0; for (let i = 0; i < ZDC.ncell; i++) eZDC += G.towE[ZDC.base + i];
+    return {
+      B, beamKey, x: kin.x, Q2: kin.Q2, y: kin.y, s: kin.s, W, Eout, thE, phE, etaE: -Math.log(Math.tan(thE / 2)),
+      kp, q, Ph, sumH, nHad: hs.length, trks, nG, nNeu, ff, eZDC, dq, struckN, nEvapN, nEvapP,
+      eCal: trks[0] && trks[0].isE ? (trks[0].cal || 'beam pipe') : '—',
+      maxPath: Math.min(G.maxPath, 12),
+    };
+  }
+
+  return { generate, G, CALS, BARREL, DISKS, FF, THC, HAX, MP, NCELL, MAXV, MAXH, MAXD, MAXTRK, BEAMS, SPC, bfield };
+})();
+/* ==== PHYSICS END ==== */
+
+const { G, CALS, BARREL, DISKS, FF, THC, MAXV, MAXH, MAXD } = PHYS;
+
+/* ---------------- display constants ---------------- */
+const GAMMA_VIS = 12;       // drawn Lorentz contraction
+const V_NUC = 1.6;          // display m/s for the incoming beam particles
+const T0 = 0.55;            // display s when hadronic tracks start
+const V_TRK = 2.8;          // display m/s for track reveal
+const OFF = T0 * V_TRK;     // scattered e⁻ is revealed from t = 0, hadrons from t = T0
+const D2R = Math.PI / 180;
+const HDIR = new THREE.Vector3(-Math.sin(THC), 0, Math.cos(THC));
+let S = 1e-15;              // metres per fm on screen (hadron zoom)
+
+/* ---------------- renderer ---------------- */
+let renderer;
+try {
+  renderer = new THREE.WebGPURenderer({ antialias: true });
+  await renderer.init();
+} catch (e) { fail('Could not start a WebGPU or WebGL2 renderer in this browser.'); throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x060a13, 1);
+app.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x060a13, 45, 120);   // fog near/far (m)
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.3; controls.maxDistance = 90;
+controls.autoRotateSpeed = 0.6; controls.autoRotate = true;
+
+scene.add(new THREE.HemisphereLight(0xbfd2ff, 0x1a1408, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, 4); scene.add(sun);
+
+/* ---------------- uniforms ---------------- */
+const uT = uniform(-10);     // reveal path length (m); negative before hadron tracks start
+const uDet = uniform(1);
+const uFire = uniform(0);
+const uFlash = uniform(0);
+const uWig = uniform(0);
+const uQax = uniform(1);
+
+/* ---------------- detector ---------------- */
+const det = new THREE.Group(); scene.add(det);
+
+function shellMat(hex, rim, base) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
+  m.colorNode = color(hex);
+  m.opacityNode = f.mul(rim).add(base).mul(uDet);
+  return m;
+}
+function cylZ(r, z0, z1, mat, sides = 96) {
+  const g = new THREE.CylinderGeometry(r, r, z1 - z0, sides, 1, true);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, (z0 + z1) / 2);
+  const m = new THREE.Mesh(g, mat); det.add(m); return m;
+}
+const lineMat = (hex, op) => new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+function segs(v, mat, parent = det) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
+}
+function ringV(r, z, n, v = [], cx = 0) {
+  for (let i = 0; i < n; i++) {
+    const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2;
+    v.push(cx + r * Math.cos(a0), r * Math.sin(a0), z, cx + r * Math.cos(a1), r * Math.sin(a1), z);
+  }
+  return v;
+}
+function polyLinesZ(r, n, z0, z1, rot, mat) {
+  const v = [];
+  for (let i = 0; i < n; i++) {
+    const a0 = rot + i / n * Math.PI * 2, a1 = rot + (i + 1) / n * Math.PI * 2;
+    const p0 = [r * Math.cos(a0), r * Math.sin(a0)], p1 = [r * Math.cos(a1), r * Math.sin(a1)];
+    for (const z of [z0, z1]) v.push(p0[0], p0[1], z, p1[0], p1[1], z);
+    v.push(p0[0], p0[1], z0, p0[0], p0[1], z1);
+  }
+  return segs(v, mat);
+}
+function cylOutline(r, z0, z1, nAx, mat) {
+  const v = ringV(r, z0, 96); ringV(r, z1, 96, v);
+  for (let i = 0; i < nAx; i++) { const a = i / nAx * Math.PI * 2; v.push(r * Math.cos(a), r * Math.sin(a), z0, r * Math.cos(a), r * Math.sin(a), z1); }
+  return segs(v, mat);
+}
+
+// tracking: SVT, MPGD barrels and AC-LGAD TOF as rim-lit shells; disks as ring outlines
+const SYS_MAT = { SVT: shellMat('#5fd3c6', 0.45, 0.02), MPGD: shellMat('#6f8db8', 0.22, 0.006), TOF: shellMat('#9fb7e0', 0.20, 0.005) };
+for (const [r, z0, z1, sys] of BARREL) cylZ(r, z0, z1, SYS_MAT[sys], r < 0.2 ? 48 : 96);
+{
+  const vS = [], vM = [];
+  for (const [z, r0, r1, sys] of DISKS) { const v = sys === 'SVT' ? vS : vM; ringV(r0, z, 32, v); ringV(r1, z, 64, v); }
+  segs(vS, lineMat(0x5fd3c6, 0.35)); segs(vM, lineMat(0x8fa9d4, 0.28));
+}
+// PID: hpDIRC (12 bar boxes), pfRICH (backward), dRICH (forward, 6 sectors)
+polyLinesZ(0.77, 12, -2.1, 1.85, Math.PI / 12, lineMat(0x9fb7e0, 0.20));
+{
+  const v = ringV(0.64, -1.18, 96); ringV(0.64, -1.55, 96, v); ringV(0.07, -1.18, 32, v); ringV(0.07, -1.55, 32, v);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; v.push(0.64 * Math.cos(a), 0.64 * Math.sin(a), -1.18, 0.64 * Math.cos(a), 0.64 * Math.sin(a), -1.55); }
+  segs(v, lineMat(0x7be3c8, 0.30));
+  const w = ringV(1.20, 1.95, 96); ringV(1.80, 3.15, 96, w); ringV(0.13, 1.95, 32, w); ringV(0.18, 3.15, 32, w);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; w.push(1.20 * Math.cos(a), 1.20 * Math.sin(a), 1.95, 1.80 * Math.cos(a), 1.80 * Math.sin(a), 3.15); w.push(0.13 * Math.cos(a), 0.13 * Math.sin(a), 1.95, 1.20 * Math.cos(a), 1.20 * Math.sin(a), 1.95); }
+  segs(w, lineMat(0x7be3c8, 0.26));
+}
+// MARCO solenoid cryostat
+cylOutline(1.42, -1.92, 1.92, 24, lineMat(0xc44a3a, 0.24));
+cylOutline(1.77, -1.92, 1.92, 24, lineMat(0xc44a3a, 0.16));
+
+// calorimeters: front faces with a procedural cell grid (TSL, fwidth-antialiased)
+function calMat(hex, k = 1, cellGrid = true) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const uvT = attribute('uvT', 'vec2');
+  const gridLine = (q, wmul) => {
+    const f = fract(q), w = fwidth(q).mul(wmul);
+    const d = min(f, float(1).sub(f));
+    const l = float(1).sub(smoothstep(float(0), w, d));
+    return max(l.x, l.y);
+  };
+  const fw = fwidth(uvT);
+  const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
+  m.colorNode = color(hex);
+  m.opacityNode = float(0.012).add(gridLine(uvT, 1.0).mul(fade).mul(cellGrid ? 0.10 : 0)).add(gridLine(uvT.mul(0.25), 1.2).mul(0.09)).mul(k).mul(uDet);
+  return m;
+}
+const CAL_HEX = { ecal: 0xc79bff, hcal: 0x5fe0a8, zdc: 0x5fe0a8 };
+const farDet = new THREE.Group(); det.add(farDet);
+for (const c of CALS) {
+  const hex = CAL_HEX[c.kind], mat = calMat('#' + new THREE.Color(hex).getHexString(THREE.SRGBColorSpace), c.kind === 'ecal' ? 1 : 0.55, c.kind === 'ecal'), edge = lineMat(hex, c.kind === 'ecal' ? 0.32 : 0.18);
+  const parent = c.kind === 'zdc' ? farDet : det;
+  let g;
+  if (c.type === 'barrel') {
+    const pos = [], uv = [], idx = [], nU = c.nphi, nV = c.neta;
+    for (let i = 0; i <= nU; i++) for (let j = 0; j <= nV; j++) {
+      const ph = i * c.dphi, et = c.eta0 + j * c.deta;
+      pos.push(c.R * Math.cos(ph), c.R * Math.sin(ph), c.R * Math.sinh(et)); uv.push(i, j);
+    }
+    for (let i = 0; i < nU; i++) for (let j = 0; j < nV; j++) { const a = i * (nV + 1) + j, b = a + nV + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uvT', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    const R2 = c.R + c.depth, z0 = c.R * Math.sinh(c.eta0), z1 = c.R * Math.sinh(c.eta1);
+    const v = ringV(c.R, z0, 128); ringV(c.R, z1, 128, v); ringV(R2, z0 * R2 / c.R, 128, v); ringV(R2, z1 * R2 / c.R, 128, v);
+    segs(v, edge, parent);
+  } else {
+    g = c.rmin > 0 ? new THREE.RingGeometry(c.rmin, c.rmax, 128, 3) : new THREE.PlaneGeometry(2 * c.half, 2 * c.half);
+    const p = g.attributes.position, uv = new Float32Array(p.count * 2);
+    for (let i = 0; i < p.count; i++) { uv[2 * i] = (p.getX(i) + c.half) / c.cell; uv[2 * i + 1] = (p.getY(i) + c.half) / c.cell; }
+    g.setAttribute('uvT', new THREE.BufferAttribute(uv, 2));
+    g.translate(c.cx, 0, c.z);
+    const zb = c.z + c.dir * c.depth;
+    if (c.rmin > 0) {
+      const v = ringV(c.rmin, c.z, 48, [], c.cx); ringV(c.rmax, c.z, 128, v, c.cx); ringV(c.rmax, zb, 128, v, c.cx); ringV(c.rmin, zb, 48, v, c.cx);
+      segs(v, edge, parent);
+    } else {
+      const h = c.half, v = [];
+      for (const z of [c.z, zb]) for (const [a, b] of [[[-h, -h], [h, -h]], [[h, -h], [h, h]], [[h, h], [-h, h]], [[-h, h], [-h, -h]]]) v.push(c.cx + a[0], a[1], z, c.cx + b[0], b[1], z);
+      for (const [x, y] of [[-h, -h], [h, -h], [h, h], [-h, h]]) v.push(c.cx + x, y, c.z, c.cx + x, y, zb);
+      segs(v, edge, parent);
+    }
+  }
+  parent.add(new THREE.Mesh(g, mat));
+}
+// beam lines: electron along −z, hadron axis tilted by the 25 mrad crossing angle
+segs([0, 0, -40, 0, 0, 40], lineMat(0x4fa3ff, 0.35), scene);
+segs([Math.sin(THC) * 40, 0, -40, -Math.sin(THC) * 40, 0, 40], lineMat(0xffb24a, 0.28), scene);
+// far detectors (schematic boxes along the outgoing hadron beam; low-Q² tagger on the electron side)
+function box(cx, cy, cz, sx, sy, sz, hex, op) {
+  const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(sx, sy, sz));
+  const l = new THREE.LineSegments(g, lineMat(hex, op)); l.position.set(cx, cy, cz); l.rotation.y = -THC; farDet.add(l); return l;
+}
+box(-Math.sin(THC) * 6.65, 0, 6.65, 0.5, 0.5, 1.5, 0x9fb7e0, 0.35);              // B0
+box(-Math.sin(THC) * FF.OMD, 0, FF.OMD, 0.35, 0.2, 0.15, 0x9fb7e0, 0.35);        // OMD
+for (const z of [26, 28]) box(-Math.sin(THC) * z, 0, z, 0.25, 0.1, 0.06, 0x9fb7e0, 0.35); // Roman pots
+box(0.0, 0, FF.LOWQ2, 0.3, 0.2, 0.3, 0x4fa3ff, 0.35);                            // low-Q² tagger
+
+/* ---------------- hadron constituents (instanced) ---------------- */
+const NCON = 200;
+const conMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.4, metalness: 0.15 });
+const conMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), conMat, NCON);
+conMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+for (let i = 0; i < NCON; i++) conMesh.setColorAt(i, new THREE.Color(0x9fb2cf));
+conMesh.frustumCulled = false; conMesh.count = 0;
+scene.add(conMesh);
+
+const glowMat = hex => { const m = new THREE.MeshBasicNodeMaterial(); m.colorNode = color(hex).mul(3); return m; };
+const eMark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMat('#bff3ff')); scene.add(eMark);
+const hMark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMat('#ffb24a')); scene.add(hMark);
+const qMark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMat('#ffd27a')); scene.add(qMark);
+
+// colour string (TSL noise shader) and impact flash
+const fireMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const n = mx_noise_float(positionLocal.mul(3.2).add(vec3(0, 0, time.mul(1.4))));
+  const core = abs(dot(normalView, positionViewDirection)).pow(1.6);
+  fireMat.colorNode = mix(color('#ff6a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7);
+  fireMat.opacityNode = uFire.mul(core.mul(0.85).add(0.12)).mul(n.mul(0.45).add(0.8));
+}
+const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 5), fireMat);
+const fireGroup = new THREE.Group(); fireGroup.add(fire); scene.add(fireGroup);
+const flashMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+flashMat.colorNode = color('#fff2cf').mul(2.5); flashMat.opacityNode = uFlash;
+const flash = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), flashMat); scene.add(flash);
+
+// virtual photon (wiggly line, recomputed per frame)
+const NWIG = 96;
+const wigPos = new Float32Array(NWIG * 3);
+const wigGeo = new THREE.BufferGeometry(); wigGeo.setAttribute('position', new THREE.BufferAttribute(wigPos, 3).setUsage(THREE.DynamicDrawUsage));
+const wigMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+wigMat.colorNode = color('#9fe8ff').mul(2.2); wigMat.opacityNode = uWig;
+const wiggle = new THREE.Line(wigGeo, wigMat); wiggle.frustumCulled = false; scene.add(wiggle);
+
+/* ---------------- tracks (one LineSegments, revealed by a TSL path-length test) ---------------- */
+const tCol = new Float32Array(MAXV * 3);
+const trkGeo = new THREE.BufferGeometry();
+const aPos = new THREE.BufferAttribute(G.tPos, 3).setUsage(THREE.DynamicDrawUsage);
+const aPath = new THREE.BufferAttribute(G.tPath, 1).setUsage(THREE.DynamicDrawUsage);
+const aCol = new THREE.BufferAttribute(tCol, 3).setUsage(THREE.DynamicDrawUsage);
+trkGeo.setAttribute('position', aPos); trkGeo.setAttribute('pathT', aPath); trkGeo.setAttribute('tcol', aCol);
+trkGeo.setDrawRange(0, 0);
+const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const head = exp(uT.sub(pT).max(0).mul(-7)).mul(2.6).add(1);
+  trkMat.colorNode = attribute('tcol', 'vec3').mul(head);
+  trkMat.opacityNode = step(pT, uT).mul(0.9);
+}
+const tracks = new THREE.LineSegments(trkGeo, trkMat); tracks.frustumCulled = false; scene.add(tracks);
+
+/* ---------------- hits (instanced, per-instance time) ---------------- */
+const hitGeo = new THREE.OctahedronGeometry(1, 0);
+const hT = new THREE.InstancedBufferAttribute(G.hT, 1).setUsage(THREE.DynamicDrawUsage);
+const hC = new THREE.InstancedBufferAttribute(new Float32Array(MAXH * 3), 3).setUsage(THREE.DynamicDrawUsage);
+hitGeo.setAttribute('hitT', hT); hitGeo.setAttribute('hcol', hC);
+const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const ht = attribute('hitT', 'float');
+  hitMat.colorNode = attribute('hcol', 'vec3').mul(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2));
+  hitMat.opacityNode = step(ht, uT);
+}
+G.hT.fill(1e9);
+const hits = new THREE.InstancedMesh(hitGeo, hitMat, MAXH); hits.frustumCulled = false;   // full count: keeps instance matrices in a vertex buffer (WebGPU uniform limit 64 kB)
+hits.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(hits);
+
+/* ---------------- dashed lines: γ, neutral hadrons, far-forward, lost e⁻, quark axis ---------------- */
+const DKIND = [
+  { hex: '#fff0b8', f: 12 },   // 0 photon
+  { hex: '#b9a6ff', f: 30 },   // 1 neutral hadron (n, K⁰L)
+  { hex: '#ff6b8b', f: 6 },    // 2 far-forward charged (p)
+  { hex: '#43ffb0', f: 10 },   // 3 scattered e⁻ into the backward beam pipe
+  { hex: '#ffb24a', f: 4 },    // 4 struck-quark axis
+].map(k => ({ ...k, c: new THREE.Color(k.hex) }));
+const dCol = new Float32Array(MAXD * 3), dFreq = new Float32Array(MAXD), dIsQ = new Float32Array(MAXD);
+const dGeo = new THREE.BufferGeometry();
+const dAttr = {
+  position: new THREE.BufferAttribute(G.dPos, 3), pathT: new THREE.BufferAttribute(G.dPath, 1),
+  dcol: new THREE.BufferAttribute(dCol, 3), dfreq: new THREE.BufferAttribute(dFreq, 1), disq: new THREE.BufferAttribute(dIsQ, 1),
+};
+for (const [k, a] of Object.entries(dAttr)) { a.setUsage(THREE.DynamicDrawUsage); dGeo.setAttribute(k, a); }
+dGeo.setDrawRange(0, 0);
+const dMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const dash = step(fract(pT.mul(attribute('dfreq', 'float'))), float(0.5));
+  const head = exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1);
+  const qOn = float(1).sub(attribute('disq', 'float').mul(float(1).sub(uQax)));
+  dMat.colorNode = attribute('dcol', 'vec3').mul(head);
+  dMat.opacityNode = step(pT, uT).mul(dash).mul(0.9).mul(qOn);
+}
+const dashes = new THREE.LineSegments(dGeo, dMat); dashes.frustumCulled = false; scene.add(dashes);
+
+/* ---------------- calorimeter towers: one mesh, 5 quads per fired cell, risen in the vertex stage ---------------- */
+const TV = 20, MAXF = 4000;
+const twBuf = {
+  position: new Float32Array(MAXF * TV * 3), normal: new Float32Array(MAXF * TV * 3),
+  dH: new Float32Array(MAXF * TV * 3), ctr: new Float32Array(MAXF * TV * 3), ecol: new Float32Array(MAXF * TV * 3),
+  top: new Float32Array(MAXF * TV), tArr: new Float32Array(MAXF * TV),
+};
+const twGeo = new THREE.BufferGeometry();
+const twAttr = {};
+for (const [k, arr] of Object.entries(twBuf)) {
+  twAttr[k] = new THREE.BufferAttribute(arr, arr.length === MAXF * TV ? 1 : 3).setUsage(THREE.DynamicDrawUsage);
+  twGeo.setAttribute(k, twAttr[k]);
+}
+{
+  const idx = new Uint32Array(MAXF * 30);
+  for (let t = 0, o = 0; t < MAXF; t++) for (let q = 0; q < 5; q++) { const b = t * TV + q * 4; idx.set([b, b + 1, b + 2, b, b + 2, b + 3], o); o += 6; }
+  twGeo.setIndex(new THREE.BufferAttribute(idx, 1));
+}
+twGeo.setDrawRange(0, 0);
+const towMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
+{
+  const top = attribute('top', 'float'), dH = attribute('dH', 'vec3'), ta = attribute('tArr', 'float'), ctr = attribute('ctr', 'vec3');
+  const grow = smoothstep(ta, ta.add(0.9), uT);
+  const risen = positionLocal.sub(dH.mul(top).mul(float(1).sub(grow)));
+  towMat.positionNode = mix(ctr, risen, step(ta, uT));
+  const col = attribute('ecol', 'vec3');
+  towMat.colorNode = col;
+  towMat.emissiveNode = col.mul(exp(uT.sub(ta).max(0).mul(-3)).mul(2.4).add(0.3));
+}
+const towers = new THREE.Mesh(twGeo, towMat); towers.frustumCulled = false; scene.add(towers);
+
+const E_STOPS = [0.05, 50];
+const E_COLS = ['#3d2b8f', '#9a3cc0', '#ff5a7a', '#ffb24a', '#fff3c4'].map(h => new THREE.Color(h));
+function energyColor(E, out) {
+  const x = THREE.MathUtils.clamp(Math.log10(E / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]), 0, 1) * 4;
+  const i = Math.min(3, Math.floor(x));
+  return out.copy(E_COLS[i]).lerp(E_COLS[i + 1], x - i);
+}
+function buildTowers() {
+  let n = 0, sumE = 0;
+  const c3 = new THREE.Vector3(), a = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), col = new THREE.Color();
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]], B = twBuf;
+  for (const c of CALS) for (let i = 0; i < c.ncell && n < MAXF; i++) {
+    const id = c.base + i, E = G.towE[id];
+    if (E < 0.05) continue;
+    if (c.kind !== 'zdc') sumE += E;
+    let w1, w2;
+    if (c.type === 'endcap') {
+      const iu = Math.floor(i / c.n), iv = i % c.n;
+      c3.set(c.cx + (iu + 0.5) * c.cell - c.half, (iv + 0.5) * c.cell - c.half, c.z);
+      a.set(0, 0, c.dir); e1.set(1, 0, 0); e2.set(0, 1, 0); w1 = w2 = 0.45 * c.cell;
+    } else {
+      const iu = Math.floor(i / c.neta), iv = i % c.neta, ph = (iu + 0.5) * c.dphi, et = c.eta0 + (iv + 0.5) * c.deta;
+      c3.set(c.R * Math.cos(ph), c.R * Math.sin(ph), c.R * Math.sinh(et));
+      a.copy(c3).normalize();                                  // projective towards the nominal IP
+      e1.set(-Math.sin(ph), Math.cos(ph), 0); e2.crossVectors(a, e1).normalize();
+      w1 = 0.45 * c.R * c.dphi; w2 = 0.45 * c.R * c.deta;
+    }
+    const H = Math.min(0.09 * Math.log(1 + E / 0.05), 1.0);
+    energyColor(E, col);
+    const bs = corners.map(([s1, s2]) => c3.clone().addScaledVector(e1, s1 * w1).addScaledVector(e2, s2 * w2));
+    const ts = bs.map(p => p.clone().addScaledVector(a, H));
+    const quads = [[ts, [1, 1, 1, 1], a]];
+    for (let k = 0; k < 4; k++) {
+      const k1 = (k + 1) % 4;
+      quads.push([[bs[k], bs[k1], ts[k1], ts[k]], [0, 0, 1, 1], bs[k].clone().add(bs[k1]).multiplyScalar(0.5).sub(c3).normalize()]);
+    }
+    let vtx = n * TV;
+    for (const [pts, tops, nrm] of quads) for (let j = 0; j < 4; j++, vtx++) {
+      const o = vtx * 3;
+      B.position[o] = pts[j].x; B.position[o + 1] = pts[j].y; B.position[o + 2] = pts[j].z;
+      B.normal[o] = nrm.x; B.normal[o + 1] = nrm.y; B.normal[o + 2] = nrm.z;
+      B.dH[o] = a.x * H; B.dH[o + 1] = a.y * H; B.dH[o + 2] = a.z * H;
+      B.ctr[o] = c3.x; B.ctr[o + 1] = c3.y; B.ctr[o + 2] = c3.z;
+      B.ecol[o] = col.r; B.ecol[o + 1] = col.g; B.ecol[o + 2] = col.b;
+      B.top[vtx] = tops[j]; B.tArr[vtx] = G.towT[id];
+    }
+    n++;
+  }
+  twGeo.setDrawRange(0, n * 30);
+  for (const at of Object.values(twAttr)) at.needsUpdate = true;
+  return { nTw: n, sumE };
+}
+
+/* ---------------- post-processing: bloom ---------------- */
+let post = null;
+try {
+  post = new THREE.PostProcessing(renderer);
+  const sp = pass(scene, camera);
+  const col = sp.getTextureNode('output');
+  post.outputNode = col.add(bloom(col, 0.85, 0.35, 0.12));
+} catch (e) { post = null; }
+
+/* ================= event ================= */
+const rnd = Math.random;
+const PT_STOPS = [0, 0.5, 1, 2, 5];
+const PT_COLS = ['#3b5bff', '#2fc4e0', '#7be38a', '#ffd166', '#ff5d3a'].map(h => new THREE.Color(h));
+const CH_COLS = { '1': new THREE.Color('#ff7a59'), '-1': new THREE.Color('#4fa3ff') };
+const GRP = { pi: { name: 'π±', col: new THREE.Color('#7aa2ff') }, K: { name: 'K±', col: new THREE.Color('#ffd166') }, p: { name: 'p, p̄', col: new THREE.Color('#ff6b8b') } };
+const E_COL = new THREE.Color('#43ffb0'), HIT_DEF = new THREE.Color('#dfe6f3');
+const tmpC = new THREE.Color();
+function trackColor(tr, mode) {
+  if (tr.isE) return E_COL;
+  if (mode === 'charge') return CH_COLS[tr.q];
+  if (mode === 'species') return GRP[tr.grp].col;
+  const p = Math.min(tr.pt, PT_STOPS[4]);
+  let i = 0; while (i < 3 && p > PT_STOPS[i + 1]) i++;
+  return tmpC.copy(PT_COLS[i]).lerp(PT_COLS[i + 1], (p - PT_STOPS[i]) / (PT_STOPS[i + 1] - PT_STOPS[i]));
+}
+
+let ev = null, evNo = 0, colorMode = 'pt', q2min = 10 ** 0.5;
+let had = { n: 0, off: [], rad: [], col: [], struck: 0, R: 0.84, A: 1 };
+const C_SEA = new THREE.Color('#7f8fb0'), C_NUC = new THREE.Color('#9fb2cf'), C_AMB = new THREE.Color('#ffb24a'), C_FLASH = new THREE.Color(4, 2.6, 1.2);
+const VAL_COLS = ['#ff5a5a', '#5aff7a', '#5a8cff'].map(h => new THREE.Color(h));
+
+function inBall(R) { let x, y, z; do { x = 2 * rnd() - 1; y = 2 * rnd() - 1; z = 2 * rnd() - 1; } while (x * x + y * y + z * z > 1); return [x * R, y * R, z * R]; }
+function buildHadron(B) {
+  const off = [], rad = [], col = [];
+  if (B.A === 1) {
+    for (let k = 0; k < 3; k++) { off.push(inBall(0.5)); rad.push(0.2); col.push(VAL_COLS[k]); }
+    for (let k = 0; k < 26; k++) { off.push(inBall(0.84)); rad.push(0.07); col.push(C_SEA); }
+    had = { n: off.length, off, rad, col, struck: Math.floor(rnd() * 3), R: 0.84, A: 1 };
+  } else {
+    const R = 6.38, a = 0.535;
+    while (off.length < B.A) {
+      const r = rnd() * 10;
+      if (rnd() * 25 > r * r / (1 + Math.exp((r - R) / a))) continue;
+      const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = 2 * Math.PI * rnd(), p = [r * st * Math.cos(ph), r * st * Math.sin(ph), r * ct];
+      if (off.some(q => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2 < 0.16)) continue;
+      off.push(p); rad.push(0.85); col.push(C_NUC);
+    }
+    had = { n: off.length, off, rad, col, struck: Math.floor(rnd() * off.length), R: 6.4, A: B.A };
+  }
+  conMesh.count = had.n;
+  for (let i = 0; i < had.n; i++) conMesh.setColorAt(i, had.col[i]);
+  conMesh.instanceColor.needsUpdate = true;
+}
+
+function newEvent() {
+  ev = PHYS.generate($('iBeam').value, q2min, OFF);
+  buildHadron(ev.B);
+  trkGeo.setDrawRange(0, G.nv); aPos.needsUpdate = true; aPath.needsUpdate = true;
+  const M = new THREE.Matrix4(), hq = new THREE.Quaternion(), hs = new THREE.Vector3(), hp = new THREE.Vector3();
+  for (let i = 0; i < G.nh; i++) {
+    hp.set(G.hPos[3 * i], G.hPos[3 * i + 1], G.hPos[3 * i + 2]); hs.setScalar(G.hS[i]);
+    hits.setMatrixAt(i, M.compose(hp, hq, hs));
+  }
+  G.hT.fill(1e9, G.nh); hT.needsUpdate = true; hits.instanceMatrix.needsUpdate = true;
+  for (let i = 0; i < G.nd; i++) {
+    const k = DKIND[G.dKind[i]];
+    dCol[3 * i] = k.c.r; dCol[3 * i + 1] = k.c.g; dCol[3 * i + 2] = k.c.b; dFreq[i] = k.f; dIsQ[i] = G.dKind[i] === 4 ? 1 : 0;
+  }
+  dGeo.setDrawRange(0, G.nd);
+  for (const a of Object.values(dAttr)) a.needsUpdate = true;
+  Object.assign(ev, buildTowers());
+  recolor();
+  evNo++;
+  simT = -1.7; lastPhase = -1;
+  stats();
+}
+
+function recolor() {
+  if (!ev) return;
+  for (let i = 0; i < G.nh; i++) { hC.array[3 * i] = HIT_DEF.r; hC.array[3 * i + 1] = HIT_DEF.g; hC.array[3 * i + 2] = HIT_DEF.b; }
+  for (const tr of ev.trks) {
+    const c = trackColor(tr, colorMode);
+    for (let i = tr.start; i < tr.start + tr.count; i++) { tCol[i * 3] = c.r; tCol[i * 3 + 1] = c.g; tCol[i * 3 + 2] = c.b; }
+    for (let i = tr.h0; i < tr.h0 + tr.nh; i++) { hC.array[i * 3] = c.r; hC.array[i * 3 + 1] = c.g; hC.array[i * 3 + 2] = c.b; }
+  }
+  aCol.needsUpdate = true; hC.needsUpdate = true;
+  legend();
+}
+
+/* ================= animation ================= */
+let simT = -1.7, paused = false, speed = 3, autoLoop = true;
+const dummy = new THREE.Object3D();
+const P0 = new THREE.Vector3(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vD = new THREE.Vector3(), vP = new THREE.Vector3(), Q_DIR = new THREE.Vector3();
+const ZAX = new THREE.Vector3(0, 0, 1);
+
+function updateBeams(t) {
+  // hadron constituents: Lorentz-contracted, moving along the tilted hadron axis
+  const so = had.off[had.struck];
+  P0.set(so[0] * S, so[1] * S, so[2] * S / GAMMA_VIS);
+  const zc = V_NUC * t;
+  for (let i = 0; i < had.n; i++) {
+    const o = had.off[i];
+    let sc = had.rad[i] * S, col = had.col[i];
+    if (i === had.struck) {
+      if (t > 0.1) sc = 0;
+      else if (t >= 0) { col = C_FLASH; sc *= 1.3; }
+      else if (t > -0.45) col = tmpC.copy(had.col[i]).lerp(C_AMB, Math.min(1, (t + 0.45) / 0.3));
+    } else if (had.A === 1 && t > 0) sc *= Math.max(0, 1 - t / 0.35);   // proton remnant hadronises
+    else if (Math.abs(zc) > 9) sc = 0;
+    dummy.position.set(HDIR.x * zc + o[0] * S, o[1] * S, HDIR.z * zc + o[2] * S / GAMMA_VIS);
+    dummy.scale.set(sc, sc, sc / GAMMA_VIS * 3);
+    dummy.updateMatrix();
+    conMesh.setMatrixAt(i, dummy.matrix);
+    conMesh.setColorAt(i, col);
+  }
+  conMesh.instanceMatrix.needsUpdate = true; conMesh.instanceColor.needsUpdate = true;
+
+  // incoming e⁻ (point-like) and a bunch marker for the hadron when it is below a pixel
+  eMark.visible = t < 0;
+  if (t < 0) { eMark.position.set(P0.x, P0.y, P0.z - V_NUC * t); eMark.scale.setScalar(0.012); }
+  hMark.visible = t < 0 && had.R * S < 0.01;
+  if (hMark.visible) { hMark.position.copy(HDIR).multiplyScalar(zc); hMark.scale.setScalar(0.01); }
+
+  // virtual photon exchange
+  const w0 = -0.3, w1 = 0.03;
+  if (t > w0 && t < w1) {
+    vA.set(P0.x, P0.y, P0.z - V_NUC * Math.min(t, 0));
+    vB.copy(HDIR).multiplyScalar(V_NUC * Math.min(t, 0)).add(P0);
+    vD.subVectors(vB, vA); const L = vD.length();
+    const perp = new THREE.Vector3().crossVectors(vD, new THREE.Vector3(0, 1, 0)); if (perp.lengthSq() < 1e-12) perp.set(1, 0, 0); perp.normalize();
+    const amp = 0.05 * L + 1e-4;
+    for (let i = 0; i < NWIG; i++) {
+      const f = i / (NWIG - 1);
+      vP.copy(vA).addScaledVector(vD, f).addScaledVector(perp, amp * Math.sin(f * Math.PI * 14) * Math.sin(f * Math.PI));
+      wigPos.set([vP.x, vP.y, vP.z], 3 * i);
+    }
+    wigGeo.attributes.position.needsUpdate = true;
+    uWig.value = Math.min(1, (t - w0) / 0.08) * Math.min(1, (w1 - t) / 0.04);
+    wiggle.visible = true;
+  } else { wiggle.visible = false; uWig.value = 0; }
+
+  // flash at the vertex (visible at any zoom)
+  if (t >= 0 && t < 0.45) { uFlash.value = Math.exp(-t * 9) * 0.9; flash.position.copy(P0); flash.scale.setScalar(0.03 + 0.12 * t); flash.visible = true; }
+  else { flash.visible = false; uFlash.value = 0; }
+
+  // struck quark and colour string (drawn in magnified fm units)
+  if (t >= 0 && t < T0 + 0.5) {
+    const Lq = 6 * t * S;                        // ≈ 6 fm per display second
+    Q_DIR.set(ev.dq[0], ev.dq[1], ev.dq[2]);
+    vA.copy(P0).addScaledVector(Q_DIR, Lq);       // quark end
+    vB.copy(P0).addScaledVector(HDIR, Lq);        // remnant end
+    qMark.visible = t < T0 + 0.2; qMark.position.copy(vA); qMark.scale.setScalar(0.18 * S * (1 - THREE.MathUtils.smoothstep(t, T0, T0 + 0.2)) + 1e-9);
+    const env = THREE.MathUtils.smoothstep(t, 0.02, 0.1) * (1 - THREE.MathUtils.smoothstep(t, T0 - 0.1, T0 + 0.5));
+    uFire.value = env;
+    vD.subVectors(vA, vB);
+    const len = vD.length();
+    fireGroup.visible = len > 1e-12;
+    fireGroup.position.addVectors(vA, vB).multiplyScalar(0.5);
+    fireGroup.quaternion.setFromUnitVectors(ZAX, vD.normalize());
+    fire.scale.set(0.35 * S * (1 + 2 * t), 0.35 * S * (1 + 2 * t), len / 2 + 0.3 * S);
+  } else { qMark.visible = false; fireGroup.visible = false; uFire.value = 0; }
+}
+
+const MPV = PHYS.MP;
+const PHASES = [
+  [-0.3, 'Approach', () => {
+    const B = ev.B, gam = (B.Ep / MPV).toFixed(0);
+    return `e⁻ (${B.Ee} GeV, point-like) meets ${B.A > 1 ? '¹⁹⁷Au' : 'a proton'} (${B.Ep} GeV${B.A > 1 ? '/u' : ''}, γ ≈ ${gam}; drawn at γ = ${GAMMA_VIS}). ${had.R * S < 0.01 ? 'Hadron at true size: raise Hadron zoom to see its constituents.' : B.A > 1 ? 'The struck nucleon is shown amber.' : 'Valence quarks in colour; the struck one turns amber.'}`;
+  }],
+  [0.04, 'γ* exchange', () => `Q² = ${ev.Q2.toFixed(1)} GeV², x = ${fx(ev.x)}, y = ${ev.y.toFixed(2)}. The virtual photon resolves λ ≈ ħc/Q ≈ ${(0.1973 / Math.sqrt(ev.Q2)).toFixed(3)} fm${ev.B.A > 1 ? ` on a struck ${ev.struckN ? 'neutron' : 'proton'}` : ''}.`],
+  [T0 + 0.1, 'Hadronisation', () => `Struck quark (current region, amber axis) and target remnant stretch a colour string; W = ${ev.W.toFixed(1)} GeV → ${ev.nHad} primary hadrons. Scattered e′ (green) leaves first.`],
+  [T0 + 3.0 / V_TRK, 'Tracking', () => `e′: E = ${ev.Eout.toFixed(2)} GeV, θ = ${(ev.thE / D2R).toFixed(1)}°, η = ${ev.etaE.toFixed(2)} → ${ev.eCal}. Tracks curl in B = 1.7 T: R[m] = p_T[GeV/c] / (0.3·B[T]). ${ev.trks.length} charged tracks.`],
+  [1e9, 'Calorimetry & far forward', () => {
+    const f = ev.ff, ffs = [['ZDC', f.ZDC], ['B0', f.B0], ['RP', f.RP], ['OMD', f.OMD]].filter(a => a[1]).map(a => `${a[1]} ${a[0]}`).join(', ');
+    return `${ev.nTw} towers above 50 MeV, ΣE = ${ev.sumE.toFixed(1)} GeV; ${ev.nG} photons from π⁰, η → γγ in the ECals. Far forward: ${ffs || 'none'}; ${f.beam} particle(s) lost in the beam pipe.${ev.B.A > 1 ? ` Nuclear breakup: ${ev.nEvapN} evaporation n, ${ev.nEvapP} p.` : ''}`;
+  }],
+];
+const fx = x => x < 1e-3 ? x.toExponential(1) : x.toFixed(4);
+let lastPhase = -1;
+function phaseUpdate(t) {
+  const i = PHASES.findIndex(p => t < p[0]);
+  if (i !== lastPhase) { lastPhase = i; $('phaseName').textContent = PHASES[i][1]; $('phaseNote').textContent = PHASES[i][2](); }
+}
+
+function stats() {
+  const B = ev.B;
+  $('beamLine').textContent = `e⁻ ${B.Ee} GeV × ${B.A > 1 ? 'Au ' + B.Ep + ' GeV/u' : 'p ' + B.Ep + ' GeV'} · √s${B.A > 1 ? '_eN' : ''} = ${Math.sqrt(ev.s).toFixed(1)} GeV · B = 1.7 T · 25 mrad crossing`;
+  $('sEv').textContent = '#' + String(evNo).padStart(3, '0');
+  $('sX').textContent = fx(ev.x);
+  $('sQ2').textContent = ev.Q2 < 100 ? ev.Q2.toFixed(1) : ev.Q2.toFixed(0);
+  $('sY').textContent = ev.y.toFixed(3);
+  $('sW').textContent = ev.W.toFixed(1);
+  $('sS').textContent = Math.sqrt(ev.s).toFixed(1);
+  $('sEe').textContent = ev.Eout.toFixed(2);
+  $('sTh').textContent = (ev.thE / D2R).toFixed(1);
+  $('sEta').textContent = ev.etaE.toFixed(2);
+  $('sNch').textContent = ev.trks.length;
+  $('sTw').textContent = ev.nTw.toLocaleString();
+  $('sSE').textContent = ev.sumE.toFixed(1);
+  $('sNg').textContent = ev.nG;
+  $('sFF').textContent = ev.ff.ZDC + ev.ff.B0 + ev.ff.RP + ev.ff.OMD;
+  $('sZDC').textContent = ev.eZDC.toFixed(0);
+}
+
+function replay() { simT = -1.7; lastPhase = -1; }
+
+/* ---------------- legend ---------------- */
+const hexOf = c => '#' + c.getHexString(THREE.SRGBColorSpace);
+function legend() {
+  const el = $('legend');
+  if (colorMode === 'pt') {
+    el.innerHTML = `<h2>Track p<sub>T</sub> (GeV/c)</h2>
+      <div class="ramp" style="background:linear-gradient(90deg,${PT_COLS.map(hexOf).join(',')})"></div>
+      <div class="ticks">${PT_STOPS.map((p, i) => `<span style="left:${p / PT_STOPS[4] * 100}%">${i === 4 ? '≥' + p : p}</span>`).join('')}</div>`;
+  } else if (colorMode === 'charge') {
+    el.innerHTML = `<h2>Track charge</h2><div class="keys">
+      <span class="key"><i style="background:#ff7a59"></i>positive</span>
+      <span class="key"><i style="background:#4fa3ff"></i>negative</span></div>`;
+  } else {
+    el.innerHTML = `<h2>Species (MC truth)</h2><div class="keys">${Object.values(GRP).map(s => `<span class="key"><i style="background:${hexOf(s.col)}"></i>${s.name}</span>`).join('')}</div>`;
+  }
+  const dash = (hex, step) => `background:repeating-linear-gradient(90deg,${hex} 0 ${step}px,transparent ${step}px ${2 * step}px)`;
+  const lg = v => (Math.log10(v / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]) * 100).toFixed(1);
+  el.insertAdjacentHTML('beforeend', `<div class="keys"><span class="key"><i style="background:${hexOf(E_COL)}"></i>scattered e′</span></div>
+    <h2 class="sub">Calorimeter cell E (GeV)</h2>
+    <div class="ramp" style="background:linear-gradient(90deg,${E_COLS.map(hexOf).join(',')})"></div>
+    <div class="ticks">${[0.05, 0.5, 5, 50].map(v => `<span style="left:${lg(v)}%">${v}</span>`).join('')}</div>
+    <div class="keys">
+      <span class="key"><i style="${dash('#fff0b8', 3)}"></i>γ (π⁰, η)</span>
+      <span class="key"><i style="${dash('#b9a6ff', 1.5)}"></i>n, K⁰<sub>L</sub></span>
+      <span class="key"><i style="${dash('#ff6b8b', 4)}"></i>far-fwd p</span>
+      <span class="key"><i style="${dash('#ffb24a', 5)}"></i>quark axis</span>
+      <span class="key muted">ECal violet · HCal green</span>
+    </div>`);
+}
+
+/* ---------------- labels ---------------- */
+const zf = z => [-Math.sin(THC) * z, 0, z];
+const LABELS = [
+  ['SVT', 'silicon vertex', [0, 0.45, 0.45]],
+  ['MPGD', 'gaseous tracker', [0, -0.74, 1.2]],
+  ['hpDIRC', 'r 0.77 m', [0.77, 0, -2.1]],
+  ['pfRICH', '', [0, 0.66, -1.4]],
+  ['dRICH', '', [0, 1.85, 2.6]],
+  ['EEEMCal', 'PbWO₄', [0, -0.66, -1.95]],
+  ['BIC', 'barrel ECal', [-0.88, -0.25, -0.3]],
+  ['FEMC', '', [0, -1.9, 3.7]],
+  ['nHCal', '', [0, 2.25, -3.6]],
+  ['BHCal', '', [0, 2.75, 0.4]],
+  ['LFHCAL', '', [0, 2.65, 4.6]],
+  ['MARCO', '1.7 T', [0, 1.8, 1.95]],
+  ['e⁻-going', 'η < 0', [0, 0, -6.5]],
+  ['hadron-going', 'η > 0', [0, 0, 6.5]],
+  ['B0', 'z ≈ 6 m', [zf(6.65)[0], 0.4, 6.65]],
+  ['OMD', '', [zf(22.5)[0], 0.25, 22.5]],
+  ['Roman pots', '', [zf(27)[0], 0.2, 27]],
+  ['ZDC', '35.8 m', [zf(35.8)[0], 0.45, 35.8]],
+  ['Low-Q² tagger', '', [0, 0.25, -24]],
+].map(([n, sub, p]) => {
+  const d = document.createElement('div'); d.className = 'lbl';
+  d.innerHTML = `<b>${n}</b>${sub ? ' · ' + sub : ''}`;
+  $('labels').appendChild(d);
+  return { d, v: new THREE.Vector3(...p) };
+});
+const MOVERS = ['e', 'h'].map(kind => {
+  const d = document.createElement('div'); d.className = 'lbl ' + (kind === 'e' ? 'elbl' : 'beamlbl');
+  $('labels').appendChild(d);
+  return { d, v: new THREE.Vector3(), kind };
+});
+const pv = new THREE.Vector3();
+function placeLabels() {
+  const w = innerWidth, h = innerHeight;
+  for (const L of MOVERS) {
+    if (L.kind === 'e') { L.v.set(0, 0.05, -V_NUC * simT); L.d.innerHTML = '<b>e⁻</b>'; }
+    else { L.v.copy(HDIR).multiplyScalar(V_NUC * simT); L.v.y += 0.05 + had.R * S; L.d.innerHTML = `<b>${ev && ev.B.A > 1 ? '¹⁹⁷Au' : 'p'}</b>`; }
+  }
+  for (const L of [...LABELS, ...MOVERS]) {
+    if (L.kind && simT > 0) { L.d.hidden = true; continue; }
+    if (!L.kind && !det.visible) { L.d.hidden = true; continue; }
+    pv.copy(L.v).project(camera);
+    const vis = pv.z < 1 && Math.abs(pv.x) < 1.05 && Math.abs(pv.y) < 1.05;
+    L.d.hidden = !vis;
+    if (vis) L.d.style.transform = `translate(${(pv.x * 0.5 + 0.5) * w}px,${(-pv.y * 0.5 + 0.5) * h}px) translate(-50%,-100%)`;
+  }
+}
+
+/* ---------------- camera presets ---------------- */
+const VIEW_ZOOM = 1.2;
+const VIEWS = {
+  v3d:   { p: [8.4, 5.0, 10.4], t: [0, 0, 0], k: true },
+  vBeam: { p: [0.001, 0.001, 15.5], t: [0, 0, 0], k: true },
+  vSide: { p: [15.5, 0.8, 0.001], t: [0, 0, 0], k: true },
+  vFar:  { p: [30, 14, 6], t: [-0.4, 0, 16], k: false },
+};
+let tween = null;
+function setView(id, instant) {
+  const V = VIEWS[id], k = V.k ? (innerWidth / innerHeight < 1 ? 1.55 : 1) * VIEW_ZOOM : 1;
+  const to = new THREE.Vector3(...V.p).multiplyScalar(k), tt = new THREE.Vector3(...V.t);
+  for (const b of Object.keys(VIEWS)) $(b).setAttribute('aria-pressed', b === id);
+  if (instant) { camera.position.copy(to); controls.target.copy(tt); return; }
+  tween = { from: camera.position.clone(), to, t: 0, tf: controls.target.clone(), tt };
+}
+
+/* ---------------- UI wiring ---------------- */
+$('hudToggle').onclick = () => { const c = $('hud').classList.toggle('collapsed'); $('hudToggle').setAttribute('aria-expanded', !c); };
+$('bNext').onclick = newEvent;
+$('bReplay').onclick = replay;
+$('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? 'Play' : 'Pause'; $('bPause').setAttribute('aria-pressed', paused); };
+$('iBeam').onchange = newEvent;
+const fmtQ2 = v => v < 10 ? v.toFixed(1) : v.toFixed(0);
+$('iQ2').oninput = e => { q2min = 10 ** +e.target.value; $('oQ2').textContent = fmtQ2(q2min) + ' GeV²'; };
+$('iQ2').onchange = newEvent;
+$('oQ2').textContent = fmtQ2(q2min) + ' GeV²';
+$('iColor').onchange = e => { colorMode = e.target.value; recolor(); };
+$('iSpeed').oninput = e => { speed = +e.target.value; $('oSpeed').textContent = speed.toFixed(1) + '×'; };
+$('cDet').onchange = e => { det.visible = e.target.checked; };
+$('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
+$('cQax').onchange = e => { uQax.value = e.target.checked ? 1 : 0; };
+$('cLoop').onchange = e => { autoLoop = e.target.checked; };
+$('cRot').onchange = e => { controls.autoRotate = e.target.checked; };
+const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+function fmtLen(m) {
+  const U = [[1, 'm'], [1e-2, 'cm'], [1e-3, 'mm'], [1e-6, 'µm'], [1e-9, 'nm'], [1e-12, 'pm'], [1e-15, 'fm']];
+  const [s, u] = U.find(([s]) => m >= s * 0.999) || U[U.length - 1];
+  const v = m / s;
+  return `${v < 10 ? v.toFixed(1) : v.toFixed(0)} ${u}`;
+}
+function setZoom(lg) {
+  const m = 10 ** lg;
+  S = m * 1e-15;
+  const e = Math.floor(lg + 1e-9), mant = m / 10 ** e;
+  const mag = m < 1.05 ? '1× (true size)' : e < 1 ? `${m.toFixed(1)}×` : `${mant.toFixed(1)}×10${String(e).split('').map(c => SUP[c]).join('')}`;
+  $('oZoom').textContent = `${mag} · R ${fmtLen(had.R * 1e-15 * m)}`;
+}
+$('iZoom').oninput = e => setZoom(+e.target.value);
+for (const id of Object.keys(VIEWS)) $(id).onclick = () => setView(id);
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); $('bPause').click(); }
+  if (e.key === 'n') newEvent();
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------------- go ---------------- */
+setView('v3d', true);
+newEvent();
+setZoom(+$('iZoom').value);
+const clock = new THREE.Clock();
+let shotReq = null;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!paused) {
+    const slow = 0.2 + 0.8 * THREE.MathUtils.smoothstep(Math.abs(simT - 0.05), 0.32, 0.6);   // slow motion around the γ* exchange
+    simT += dt * speed * slow;
+  }
+  updateBeams(simT);
+  uT.value = (simT - T0) * V_TRK;
+  phaseUpdate(simT);
+  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 0.9);
+    const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
+    camera.position.lerpVectors(tween.from, tween.to, e);
+    controls.target.lerpVectors(tween.tf, tween.tt, e);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+  if (!$('labels').hidden) placeLabels();
+  if (post) post.render(); else renderer.render(scene, camera);
+  if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
+});
+
+/* ---------------- screenshot ---------------- */
+// Inside the Claude viewer: save through the downloads capability. Standalone (file opened in a browser): plain <a download>.
+let downloads = null;
+const inViewer = typeof window.claude?.use === 'function';
+$('bShot').hidden = false;
+if (inViewer) (async () => { try { downloads = await window.claude.use('downloads'); } catch (e) { downloads = null; } })();
+function saveLocally(blob, filename) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function composeShot(done) {
+  const src = renderer.domElement, c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const k = c.width / innerWidth, pad = 18 * k, B = ev.B;
+  g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
+  g.fillStyle = '#dfe6f3'; g.textBaseline = 'bottom';
+  g.fillText(`ePIC · e+${B.A > 1 ? 'Au' : 'p'} ${B.Ee}×${B.Ep} GeV · NC DIS · toy MC`, pad, c.height - pad - 18 * k);
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = '#8796b1';
+  g.fillText(`Event #${String(evNo).padStart(3, '0')} · Q² = ${ev.Q2.toFixed(1)} GeV² · x = ${fx(ev.x)} · y = ${ev.y.toFixed(2)} · W = ${ev.W.toFixed(1)} GeV · ${ev.trks.length} tracks · ${ev.nTw} towers`, pad, c.height - pad);
+  c.toBlob(done, 'image/png');
+}
+$('bShot').onclick = () => {
+  const b = $('bShot');
+  shotReq = async blob => {
+    if (!blob) { b.textContent = 'Screenshot failed'; return; }
+    const filename = `epic-dis-event-${String(evNo).padStart(3, '0')}.png`;
+    if (!downloads) {
+      if (inViewer) { b.textContent = 'Save unavailable'; setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return; }
+      saveLocally(blob, filename); b.textContent = 'Saved';
+      setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return;
+    }
+    try { await downloads.save({ filename, data: blob }); b.textContent = 'Saved'; }
+    catch (e) {
+      b.textContent = e?.code === 'declined' ? 'Save screenshot' : 'Save unavailable';
+      if (['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e?.code)) b.hidden = true;
+    }
+    setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800);
+  };
+};
+
+function fail(msg) {
+  const d = document.createElement('div'); d.id = 'fail'; d.textContent = msg; app.prepend(d);
+  $('phaseName').textContent = 'Renderer unavailable'; $('phaseNote').textContent = msg;
+}
+</script>
+</body>
+</html>
