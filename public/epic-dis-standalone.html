@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: full-bleed WebGPU event display; glass HUD top-left, legend top-right, control rail at the bottom. Single dark theme (event-display convention). */
+/* Layout: full-bleed WebGPU event display; glass HUD top-left, legend top-right, foldable control rail at the bottom. Dark by default; "Light background" sets data-theme="light". */
 :root{
   color-scheme: dark;
   --void:#060a13;
@@ -17,9 +17,26 @@
   --line:rgba(140,165,205,.20);
   --amber:#ffb24a;
   --steel:#6f8db8;
+  --ecol:#9fe8ff;
+  --opt:#0d1526;
+  --on-amber:#1a1205;
   --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 }
+:root[data-theme="light"]{
+  color-scheme: light;
+  --void:#eef1f6;
+  --panel:rgba(255,255,255,.82);
+  --ink:#14202f;
+  --muted:#566377;
+  --line:rgba(30,50,90,.18);
+  --amber:#b85f00;
+  --steel:#5b7499;
+  --ecol:#0b7a9e;
+  --opt:#ffffff;
+  --on-amber:#ffffff;
+}
+:root[data-theme="light"] #legend .key i,:root[data-theme="light"] #legend .ramp{filter:brightness(.68) saturate(1.25)}
 body{margin:0;padding:0}
 [hidden]{display:none!important}
 html,body{height:100%;overflow:hidden}
@@ -30,7 +47,7 @@ body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:1
 .lbl{position:absolute;transform:translate(-50%,-100%);font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-bottom:4px;border-bottom:1px solid var(--line)}
 .lbl b{color:var(--ink);font-weight:500}
 .lbl.beamlbl{color:var(--amber);border-bottom-color:var(--amber);text-transform:none}
-.lbl.elbl{color:#9fe8ff;border-bottom-color:#9fe8ff;text-transform:none}
+.lbl.elbl{color:var(--ecol);border-bottom-color:var(--ecol);text-transform:none}
 .panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 #hud{top:calc(16px + env(safe-area-inset-top,0px));left:16px;width:min(340px,calc(100% - 32px));padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 150px);overflow:auto}
 .eyebrow{font:500 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--amber)}
@@ -70,13 +87,20 @@ details a{color:var(--ink)}
 .key i{width:14px;height:3px;border-radius:2px;display:inline-block}
 .key.muted{color:var(--muted)}
 .zoom output{min-width:19ch}
-#controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.ctl-head,.ctl-body{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.ctl-head{gap:8px 10px}
+#ctlToggle{display:flex;align-items:center;gap:6px;background:transparent;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#ctlToggle .chev{font-size:13px;transition:transform .2s}
+#controls.collapsed{right:auto;max-width:calc(100% - 32px)}
+#controls.collapsed .ctl-body{display:none}
+#controls.collapsed #ctlToggle .chev{transform:rotate(180deg)}
 .grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .grp>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:rgba(120,150,200,.10);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
-select option{background:#0d1526}
+select option{background:var(--opt)}
 button:hover,select:hover{border-color:var(--steel)}
-button.primary{background:var(--amber);color:#1a1205;border-color:var(--amber);font-weight:600}
+button.primary{background:var(--amber);color:var(--on-amber);border-color:var(--amber);font-weight:600}
 button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
 input[type=range]{accent-color:var(--amber);width:110px}
 output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
@@ -89,7 +113,7 @@ input[type=checkbox]{accent-color:var(--amber)}
   h1{font-size:22px}
   .stats dd{font-size:16px}
   .hide-sm{display:none}
-  #controls{gap:8px 12px}
+  .ctl-body{gap:8px 12px}
   input[type=range]{width:90px}
 }
 @media (max-height:620px){ details{display:none} }
@@ -143,13 +167,16 @@ input[type=checkbox]{accent-color:var(--amber)}
 
   <aside class="panel" id="legend" aria-label="Colour legend"></aside>
 
-  <section class="panel" id="controls" aria-label="Controls">
-    <div class="grp">
+  <section class="panel collapsed" id="controls" aria-label="Controls">
+    <div class="ctl-head">
+      <button id="ctlToggle" type="button" aria-expanded="false" aria-controls="ctlBody">Controls<span class="chev" aria-hidden="true">▾</span></button>
       <button id="bNext" class="primary">New event</button>
       <button id="bReplay">Replay</button>
       <button id="bPause" aria-pressed="false">Pause</button>
+      <label class="chk"><input id="cLight" type="checkbox">Light background</label>
       <button id="bShot" hidden>Save screenshot</button>
     </div>
+    <div class="ctl-body" id="ctlBody">
     <div class="grp">
       <span>Beams</span>
       <select id="iBeam" aria-label="Beam configuration">
@@ -197,6 +224,7 @@ input[type=checkbox]{accent-color:var(--amber)}
       <label class="chk"><input id="cQax" type="checkbox" checked>Quark axis</label>
       <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
       <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
     </div>
   </section>
 </div>
@@ -640,15 +668,20 @@ const uFire = uniform(0);
 const uFlash = uniform(0);
 const uWig = uniform(0);
 const uQax = uniform(1);
+const uLight = uniform(0);                                   // 1 = light background
+const ink = (c, k) => mix(c, c.mul(k), uLight);              // darken a colour on the light background
+const boost = k => mix(float(1), float(k), uLight);          // raise opacity on the light background
+const ADD_MATS = [];                                         // additive on dark, normal blending on light
+const addMat = m => { ADD_MATS.push(m); return m; };
 
 /* ---------------- detector ---------------- */
 const det = new THREE.Group(); scene.add(det);
 
 function shellMat(hex, rim, base) {
-  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const m = addMat(new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
   const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
-  m.colorNode = color(hex);
-  m.opacityNode = f.mul(rim).add(base).mul(uDet);
+  m.colorNode = ink(color(hex), 0.5);
+  m.opacityNode = f.mul(rim).add(base).mul(uDet).mul(boost(2.5));
   return m;
 }
 function cylZ(r, z0, z1, mat, sides = 96) {
@@ -656,7 +689,11 @@ function cylZ(r, z0, z1, mat, sides = 96) {
   g.rotateX(Math.PI / 2); g.translate(0, 0, (z0 + z1) / 2);
   const m = new THREE.Mesh(g, mat); det.add(m); return m;
 }
-const lineMat = (hex, op) => new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+const lineMat = (hex, op) => {
+  const m = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false });
+  m.colorNode = ink(color(hex), 0.55); m.opacityNode = float(op).mul(boost(1.8));
+  return m;
+};
 function segs(v, mat, parent = det) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
   const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
@@ -708,7 +745,7 @@ cylOutline(1.77, -1.92, 1.92, 24, lineMat(0xc44a3a, 0.16));
 
 // calorimeters: front faces with a procedural cell grid (TSL, fwidth-antialiased)
 function calMat(hex, k = 1, cellGrid = true) {
-  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const m = addMat(new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
   const uvT = attribute('uvT', 'vec2');
   const gridLine = (q, wmul) => {
     const f = fract(q), w = fwidth(q).mul(wmul);
@@ -718,8 +755,8 @@ function calMat(hex, k = 1, cellGrid = true) {
   };
   const fw = fwidth(uvT);
   const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
-  m.colorNode = color(hex);
-  m.opacityNode = float(0.012).add(gridLine(uvT, 1.0).mul(fade).mul(cellGrid ? 0.10 : 0)).add(gridLine(uvT.mul(0.25), 1.2).mul(0.09)).mul(k).mul(uDet);
+  m.colorNode = ink(color(hex), 0.5);
+  m.opacityNode = boost(2.2).mul(float(0.012).add(gridLine(uvT, 1.0).mul(fade).mul(cellGrid ? 0.10 : 0)).add(gridLine(uvT.mul(0.25), 1.2).mul(0.09))).mul(k).mul(uDet);
   return m;
 }
 const CAL_HEX = { ecal: 0xc79bff, hcal: 0x5fe0a8, zdc: 0x5fe0a8 };
@@ -783,31 +820,31 @@ for (let i = 0; i < NCON; i++) conMesh.setColorAt(i, new THREE.Color(0x9fb2cf));
 conMesh.frustumCulled = false; conMesh.count = 0;
 scene.add(conMesh);
 
-const glowMat = hex => { const m = new THREE.MeshBasicNodeMaterial(); m.colorNode = color(hex).mul(3); return m; };
+const glowMat = hex => { const m = new THREE.MeshBasicNodeMaterial(); m.colorNode = ink(color(hex).mul(3), 0.2); return m; };
 const eMark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMat('#bff3ff')); scene.add(eMark);
 const hMark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMat('#ffb24a')); scene.add(hMark);
 const qMark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMat('#ffd27a')); scene.add(qMark);
 
 // colour string (TSL noise shader) and impact flash
-const fireMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+const fireMat = addMat(new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
 {
   const n = mx_noise_float(positionLocal.mul(3.2).add(vec3(0, 0, time.mul(1.4))));
   const core = abs(dot(normalView, positionViewDirection)).pow(1.6);
-  fireMat.colorNode = mix(color('#ff6a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7);
+  fireMat.colorNode = mix(color('#ff6a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7).mul(boost(0.5));
   fireMat.opacityNode = uFire.mul(core.mul(0.85).add(0.12)).mul(n.mul(0.45).add(0.8));
 }
 const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 5), fireMat);
 const fireGroup = new THREE.Group(); fireGroup.add(fire); scene.add(fireGroup);
-const flashMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-flashMat.colorNode = color('#fff2cf').mul(2.5); flashMat.opacityNode = uFlash;
+const flashMat = addMat(new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+flashMat.colorNode = mix(color('#fff2cf').mul(2.5), color('#e0661a'), uLight); flashMat.opacityNode = uFlash;
 const flash = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), flashMat); scene.add(flash);
 
 // virtual photon (wiggly line, recomputed per frame)
 const NWIG = 96;
 const wigPos = new Float32Array(NWIG * 3);
 const wigGeo = new THREE.BufferGeometry(); wigGeo.setAttribute('position', new THREE.BufferAttribute(wigPos, 3).setUsage(THREE.DynamicDrawUsage));
-const wigMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-wigMat.colorNode = color('#9fe8ff').mul(2.2); wigMat.opacityNode = uWig;
+const wigMat = addMat(new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+wigMat.colorNode = mix(color('#9fe8ff').mul(2.2), color('#0a6f96'), uLight); wigMat.opacityNode = uWig;
 const wiggle = new THREE.Line(wigGeo, wigMat); wiggle.frustumCulled = false; scene.add(wiggle);
 
 /* ---------------- tracks (one LineSegments, revealed by a TSL path-length test) ---------------- */
@@ -818,11 +855,11 @@ const aPath = new THREE.BufferAttribute(G.tPath, 1).setUsage(THREE.DynamicDrawUs
 const aCol = new THREE.BufferAttribute(tCol, 3).setUsage(THREE.DynamicDrawUsage);
 trkGeo.setAttribute('position', aPos); trkGeo.setAttribute('pathT', aPath); trkGeo.setAttribute('tcol', aCol);
 trkGeo.setDrawRange(0, 0);
-const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+const trkMat = addMat(new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
 {
   const pT = attribute('pathT', 'float');
   const head = exp(uT.sub(pT).max(0).mul(-7)).mul(2.6).add(1);
-  trkMat.colorNode = attribute('tcol', 'vec3').mul(head);
+  trkMat.colorNode = mix(attribute('tcol', 'vec3').mul(head), attribute('tcol', 'vec3').mul(0.68), uLight);
   trkMat.opacityNode = step(pT, uT).mul(0.9);
 }
 const tracks = new THREE.LineSegments(trkGeo, trkMat); tracks.frustumCulled = false; scene.add(tracks);
@@ -832,10 +869,10 @@ const hitGeo = new THREE.OctahedronGeometry(1, 0);
 const hT = new THREE.InstancedBufferAttribute(G.hT, 1).setUsage(THREE.DynamicDrawUsage);
 const hC = new THREE.InstancedBufferAttribute(new Float32Array(MAXH * 3), 3).setUsage(THREE.DynamicDrawUsage);
 hitGeo.setAttribute('hitT', hT); hitGeo.setAttribute('hcol', hC);
-const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+const hitMat = addMat(new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
 {
   const ht = attribute('hitT', 'float');
-  hitMat.colorNode = attribute('hcol', 'vec3').mul(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2));
+  hitMat.colorNode = mix(attribute('hcol', 'vec3').mul(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2)), attribute('hcol', 'vec3').mul(0.5), uLight);
   hitMat.opacityNode = step(ht, uT);
 }
 G.hT.fill(1e9);
@@ -858,13 +895,13 @@ const dAttr = {
 };
 for (const [k, a] of Object.entries(dAttr)) { a.setUsage(THREE.DynamicDrawUsage); dGeo.setAttribute(k, a); }
 dGeo.setDrawRange(0, 0);
-const dMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+const dMat = addMat(new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
 {
   const pT = attribute('pathT', 'float');
   const dash = step(fract(pT.mul(attribute('dfreq', 'float'))), float(0.5));
   const head = exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1);
   const qOn = float(1).sub(attribute('disq', 'float').mul(float(1).sub(uQax)));
-  dMat.colorNode = attribute('dcol', 'vec3').mul(head);
+  dMat.colorNode = mix(attribute('dcol', 'vec3').mul(head), attribute('dcol', 'vec3').mul(0.55), uLight);
   dMat.opacityNode = step(pT, uT).mul(dash).mul(0.9).mul(qOn);
 }
 const dashes = new THREE.LineSegments(dGeo, dMat); dashes.frustumCulled = false; scene.add(dashes);
@@ -954,12 +991,13 @@ function buildTowers() {
 }
 
 /* ---------------- post-processing: bloom ---------------- */
-let post = null;
+let post = null, bloomNode = null;
 try {
   post = new THREE.PostProcessing(renderer);
   const sp = pass(scene, camera);
   const col = sp.getTextureNode('output');
-  post.outputNode = col.add(bloom(col, 0.85, 0.35, 0.12));
+  bloomNode = bloom(col, 0.85, 0.35, 0.12);
+  post.outputNode = col.add(bloomNode);
 } catch (e) { post = null; }
 
 /* ================= event ================= */
@@ -1259,6 +1297,18 @@ function setView(id, instant) {
 
 /* ---------------- UI wiring ---------------- */
 $('hudToggle').onclick = () => { const c = $('hud').classList.toggle('collapsed'); $('hudToggle').setAttribute('aria-expanded', !c); };
+$('ctlToggle').onclick = () => { const c = $('controls').classList.toggle('collapsed'); $('ctlToggle').setAttribute('aria-expanded', !c); };
+const BG = { dark: 0x060a13, light: 0xeef1f6 };
+function applyTheme(light) {
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  uLight.value = light ? 1 : 0;
+  renderer.setClearColor(light ? BG.light : BG.dark, 1);
+  scene.fog.color.setHex(light ? BG.light : BG.dark);
+  for (const m of ADD_MATS) { m.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; m.needsUpdate = true; }
+  if (bloomNode) bloomNode.strength.value = light ? 0 : 0.85;   // bloom washes out on white
+  $('cLight').checked = light;
+}
+$('cLight').onchange = e => applyTheme(e.target.checked);
 $('bNext').onclick = newEvent;
 $('bReplay').onclick = replay;
 $('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? 'Play' : 'Pause'; $('bPause').setAttribute('aria-pressed', paused); };
@@ -1294,6 +1344,8 @@ addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.code === 'Space') { e.preventDefault(); $('bPause').click(); }
   if (e.key === 'n') newEvent();
+  if (e.key === 'c') $('ctlToggle').click();
+  if (e.key === 'l') applyTheme(!$('cLight').checked);
 });
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -1301,6 +1353,7 @@ addEventListener('resize', () => {
 });
 
 /* ---------------- go ---------------- */
+applyTheme(false);   // always start on the dark background
 setView('v3d', true);
 newEvent();
 setZoom(+$('iZoom').value);
@@ -1347,9 +1400,10 @@ function composeShot(done) {
   g.drawImage(src, 0, 0);
   const k = c.width / innerWidth, pad = 18 * k, B = ev.B;
   g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
-  g.fillStyle = '#dfe6f3'; g.textBaseline = 'bottom';
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue('--ink').trim(); g.textBaseline = 'bottom';
   g.fillText(`ePIC · e+${B.A > 1 ? 'Au' : 'p'} ${B.Ee}×${B.Ep} GeV · NC DIS · toy MC`, pad, c.height - pad - 18 * k);
-  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = '#8796b1';
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = css.getPropertyValue('--muted').trim();
   g.fillText(`Event #${String(evNo).padStart(3, '0')} · Q² = ${ev.Q2.toFixed(1)} GeV² · x = ${fx(ev.x)} · y = ${ev.y.toFixed(2)} · W = ${ev.W.toFixed(1)} GeV · ${ev.trks.length} tracks · ${ev.nTw} towers`, pad, c.height - pad);
   c.toBlob(done, 'image/png');
 }

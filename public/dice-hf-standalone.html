@@ -84,6 +84,25 @@ output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
 label.chk{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--ink)}
 input[type=checkbox]{accent-color:var(--amber)}
 #fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-inline:16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+/* light background: same layout, light tokens */
+body.light{
+  color-scheme: light;
+  --void:#f5f6f9;
+  --panel:rgba(255,255,255,.84);
+  --ink:#1b2233;
+  --muted:#56637b;
+  --line:rgba(40,60,100,.18);
+  --amber:#b4610a;
+  --steel:#5a78a8;
+}
+body.light button.primary{color:#fff}
+body.light select option{background:#fff}
+/* foldable control rail */
+#ctlToggle{display:flex;align-items:center;gap:8px;font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#ctlToggle .chev{font-size:13px;transition:transform .2s}
+#controls.collapsed #ctlToggle .chev{transform:rotate(180deg)}
+.ctl-body{display:contents}
+#controls.collapsed .ctl-body{display:none}
 @media (max-width:720px){
   #legend{display:none}
   #hud{padding:10px 12px;gap:7px}
@@ -148,13 +167,16 @@ input[type=checkbox]{accent-color:var(--amber)}
 
   <aside class="panel" id="legend" aria-label="Colour legend"></aside>
 
-  <section class="panel" id="controls" aria-label="Controls">
+  <section class="panel collapsed" id="controls" aria-label="Controls">
     <div class="grp">
+      <button id="ctlToggle" type="button" aria-expanded="false" aria-controls="ctlBody">Controls<span class="chev" aria-hidden="true">▾</span></button>
       <button id="bNext" class="primary">New event</button>
       <button id="bReplay">Replay</button>
       <button id="bPause" aria-pressed="false">Pause</button>
+      <label class="chk"><input id="cLight" type="checkbox" autocomplete="off">Light background</label>
       <button id="bShot" hidden>Save screenshot</button>
     </div>
+    <div id="ctlBody" class="ctl-body">
     <div class="grp">
       <span>System</span>
       <select id="iSys" aria-label="Collision system">
@@ -212,6 +234,7 @@ input[type=checkbox]{accent-color:var(--amber)}
       <label class="chk"><input id="cUE" type="checkbox" checked>Bulk hadrons</label>
       <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
       <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
     </div>
   </section>
 </div>
@@ -703,6 +726,8 @@ const uDet = uniform(1);
 const uFire = uniform(0);
 const uFlash = uniform(0);
 const uUE = uniform(1);
+const uLight = uniform(0);                              // 1 = light background
+const INK = mix(float(1), float(0.6), uLight);          // darken scene colours on a light background
 
 /* ---------------- detector ---------------- */
 const det = new THREE.Group(); scene.add(det);
@@ -710,11 +735,16 @@ const det = new THREE.Group(); scene.add(det);
 function shellMat(hex, rim, base) {
   const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
   const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
-  m.colorNode = color(hex);
-  m.opacityNode = f.mul(rim).add(base).mul(uDet);
+  m.colorNode = color(hex).mul(INK);
+  m.opacityNode = f.mul(rim).add(base).mul(mix(float(1), float(1.6), uLight)).mul(uDet);
   return m;
 }
-const lineMat = (hex, op) => new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+const lineMat = (hex, op) => {
+  const m = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false });
+  m.colorNode = color(new THREE.Color(hex)).mul(INK);
+  m.opacityNode = float(op).mul(mix(float(1), float(1.5), uLight)).min(1);
+  return m;
+};
 function segs(v, mat, parent = det) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
   const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
@@ -750,7 +780,7 @@ function gridMat(hex, base, fine, coarse) {
   };
   const fw = fwidth(uvT);
   const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
-  m.colorNode = color(hex);
+  m.colorNode = color(hex).mul(INK);
   m.opacityNode = float(base).add(gridLine(uvT, 1.0).mul(fade).mul(fine)).add(gridLine(uvT.mul(1 / 4), 1.2).mul(coarse)).mul(uDet);
   return m;
 }
@@ -873,8 +903,9 @@ const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: 
   const isUE = attribute('isUE', 'float');
   const ueOn = float(1).sub(isUE.mul(float(1).sub(uUE)));
   // bulk hadrons: no leading-edge glow and lower opacity, so ~10³ lines meeting at the vertex do not saturate the bloom
-  trkMat.colorNode = attribute('tcol', 'vec3').mul(mix(head, float(0.55), isUE));
-  trkMat.opacityNode = step(pT, uT).mul(mix(float(0.95), float(0.16), isUE)).mul(ueOn);
+  const glow = mix(head, float(1), uLight);              // no leading-edge glow on a light background
+  trkMat.colorNode = attribute('tcol', 'vec3').mul(mix(glow, float(0.55), isUE)).mul(INK);
+  trkMat.opacityNode = step(pT, uT).mul(mix(float(0.95), mix(float(0.16), float(0.24), uLight), isUE)).mul(ueOn);
 }
 const tracks = new THREE.LineSegments(trkGeo, trkMat); tracks.frustumCulled = false; scene.add(tracks);
 
@@ -888,7 +919,7 @@ const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: 
 {
   const ht = attribute('hitT', 'float');
   const ueOn = float(1).sub(attribute('hUE', 'float').mul(float(1).sub(uUE)));
-  hitMat.colorNode = attribute('hcol', 'vec3').mul(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2));
+  hitMat.colorNode = attribute('hcol', 'vec3').mul(mix(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2), float(1), uLight)).mul(INK);
   hitMat.opacityNode = step(ht, uT).mul(ueOn).mul(float(1).sub(attribute('hUE', 'float').mul(0.5)));
 }
 G.hT.fill(1e9);
@@ -913,7 +944,7 @@ const dMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: fa
 {
   const pT = attribute('pathT', 'float');
   const dash = step(fract(pT.mul(attribute('dfreq', 'float'))), float(0.5));
-  dMat.colorNode = attribute('dcol', 'vec3').mul(exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1));
+  dMat.colorNode = attribute('dcol', 'vec3').mul(mix(exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1), float(1), uLight)).mul(INK);
   dMat.opacityNode = step(pT, uT).mul(dash).mul(0.9);
 }
 const dashes = new THREE.LineSegments(dGeo, dMat); dashes.frustumCulled = false; scene.add(dashes);
@@ -1235,6 +1266,22 @@ $('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
 $('cUE').onchange = e => { uUE.value = e.target.checked ? 1 : 0; };
 $('cLoop').onchange = e => { autoLoop = e.target.checked; };
 $('cRot').onchange = e => { controls.autoRotate = e.target.checked; };
+// light background: swap the clear colour, fog and page tokens; additive materials switch to normal blending (additive vanishes on white)
+let light = false;
+function setLight(on) {
+  light = on; uLight.value = on ? 1 : 0;
+  document.body.classList.toggle('light', on);
+  const bg = on ? 0xf5f6f9 : 0x060a13;
+  renderer.setClearColor(bg, 1); scene.fog.color.setHex(bg);
+  scene.traverse(o => {
+    const m = o.material; if (!m || Array.isArray(m)) return;
+    if (m.userData.additive === undefined) m.userData.additive = m.blending === THREE.AdditiveBlending;
+    if (m.userData.additive) { m.blending = on ? THREE.NormalBlending : THREE.AdditiveBlending; m.needsUpdate = true; }
+  });
+  $('cLight').checked = on;
+}
+$('cLight').onchange = e => setLight(e.target.checked);
+$('ctlToggle').onclick = () => { const c = $('controls').classList.toggle('collapsed'); $('ctlToggle').setAttribute('aria-expanded', !c); fitView(); };
 const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
 function fmtLen(m) {
   const U = [[1, 'm'], [1e-2, 'cm'], [1e-3, 'mm'], [1e-6, 'µm'], [1e-9, 'nm'], [1e-12, 'pm'], [1e-15, 'fm']];
@@ -1278,6 +1325,10 @@ setView(VIEWS[QS.get('view')] ? QS.get('view') : 'v3d', true);
 newEvent();
 if (QS.has('t')) { simT = +QS.get('t'); uT.value = reveal(simT - T0); }
 if (QS.has('pause')) $('bPause').click();
+// light background is OFF by default; ignore any checkbox state the browser/viewer restores from a previous visit
+setLight(QS.has('light'));
+setTimeout(() => { if ($('cLight').checked !== light) $('cLight').checked = light; }, 800);
+if (QS.has('controls')) $('ctlToggle').click();
 if (QS.has('view') && QS.get('view') !== 'v3d') { controls.autoRotate = false; $('cRot').checked = false; }
 const clock = new THREE.Clock();
 let shotReq = null;
@@ -1298,7 +1349,7 @@ renderer.setAnimationLoop(() => {
   }
   controls.update();
   if (!$('labels').hidden) placeLabels();
-  if (post) post.render(); else renderer.render(scene, camera);
+  if (post && !light) post.render(); else renderer.render(scene, camera);
   if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
 });
 
@@ -1320,9 +1371,10 @@ function composeShot(done) {
   g.drawImage(src, 0, 0);
   const k = c.width / innerWidth, pad = 18 * k;
   g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
-  g.fillStyle = '#dfe6f3'; g.textBaseline = 'bottom';
+  const tok = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+  g.fillStyle = tok('--ink'); g.textBaseline = 'bottom';
   g.fillText(`DiCE (NA60+) · ${ev.S.name} ${ev.cfg.pBeam} ${ev.S.unit} · √sNN = ${ev.K.rs.toFixed(1)} GeV · ${SIG_TXT[ev.sig.kind]} · toy MC`, pad, c.height - pad - 18 * k);
-  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = '#8796b1';
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = tok('--muted');
   g.fillText(`Event #${String(evNo).padStart(3, '0')} · ${ev.S.Ap > 1 ? 'centrality ' + ev.gl.c.toFixed(1) + '% · ' : ''}b = ${ev.gl.b.toFixed(2)} fm · Npart ${ev.gl.npart} · ${ev.nMuTrig} triggered μ${ev.mmm ? ' · Mμμ = ' + ev.mmm.toFixed(3) + ' GeV' : ''}${ev.charm ? ' · L = ' + fmtL(ev.charm.L) : ''}`, pad, c.height - pad);
   c.toBlob(done, 'image/png');
 }

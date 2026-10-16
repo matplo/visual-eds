@@ -20,8 +20,25 @@
   --line:rgba(140,165,205,.20);
   --amber:#ffb24a;
   --steel:#6f8db8;
+  --btn:rgba(120,150,200,.10);
+  --on-accent:#1a1205;
+  --gamma:#fff0b8;
   --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+/* Light theme: toggled by the page's own button (class on <html>), independent of the host theme */
+html.light{
+  color-scheme: light;
+  --void:#eef1f6;
+  --panel:rgba(252,253,255,.84);
+  --ink:#172033;
+  --muted:#56637c;
+  --line:rgba(40,60,100,.20);
+  --amber:#b86400;
+  --steel:#41618f;
+  --btn:rgba(40,70,120,.07);
+  --on-accent:#ffffff;
+  --gamma:#9a6a00;
 }
 html,body{height:100%;overflow:hidden}
 body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:12px}
@@ -64,7 +81,7 @@ details i{color:var(--ink);font-style:normal}
 .keys{display:flex;flex-wrap:wrap;gap:6px 12px}
 .key{display:flex;align-items:center;gap:6px}
 .key i{width:14px;height:3px;border-radius:2px;display:inline-block}
-.key i.dash{background:repeating-linear-gradient(90deg,#fff0b8 0 3px,transparent 3px 6px)}
+.key i.dash{background:repeating-linear-gradient(90deg,var(--gamma) 0 3px,transparent 3px 6px)}
 .key.muted{color:var(--muted)}
 #legend h2.sub{margin-top:12px}
 #legend .keys{margin-top:6px}
@@ -72,11 +89,18 @@ details a{color:var(--ink)}
 .lbl.pb{color:var(--amber);border-bottom-color:var(--amber)}
 .zoom output{min-width:19ch}
 #controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#controls.collapsed{right:auto;max-width:calc(100% - 32px)}
+.ctl-bar,.ctl-body{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.ctl-bar{gap:6px 8px}
+.ctl-bar label.chk{margin-left:6px}
+#controls.collapsed .ctl-body{display:none}
+#ctlToggle .chev{font-size:12px;margin-left:4px;display:inline-block;transition:transform .2s}
+#controls.collapsed #ctlToggle .chev{transform:rotate(180deg)}
 .grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .grp>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:rgba(120,150,200,.10);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
+button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
 button:hover,select:hover{border-color:var(--steel)}
-button.primary{background:var(--amber);color:#1a1205;border-color:var(--amber);font-weight:600}
+button.primary{background:var(--amber);color:var(--on-accent);border-color:var(--amber);font-weight:600}
 button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
 input[type=range]{accent-color:var(--amber);width:120px}
 output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
@@ -89,7 +113,7 @@ input[type=checkbox]{accent-color:var(--amber)}
   h1{font-size:22px}
   .stats dd{font-size:16px}
   .hide-sm{display:none}
-  #controls{gap:8px 12px}
+  #controls,.ctl-body{gap:8px 12px}
   input[type=range]{width:96px}
 }
 @media (max-height:620px){ details{display:none} }
@@ -138,13 +162,16 @@ input[type=checkbox]{accent-color:var(--amber)}
 
   <aside class="panel" id="legend" aria-label="Colour legend"></aside>
 
-  <section class="panel" id="controls" aria-label="Controls">
-    <div class="grp">
+  <section class="panel collapsed" id="controls" aria-label="Controls">
+    <div class="ctl-bar">
+      <button id="ctlToggle" type="button" aria-expanded="false" aria-controls="ctlBody">Controls<span class="chev" aria-hidden="true">▾</span></button>
       <button id="bNext" class="primary">New event</button>
       <button id="bReplay">Replay</button>
       <button id="bPause" aria-pressed="false">Pause</button>
       <button id="bShot" hidden>Save screenshot</button>
+      <label class="chk"><input id="cLight" type="checkbox">Light background</label>
     </div>
+    <div class="ctl-body" id="ctlBody">
     <div class="grp">
       <span>Centrality</span>
       <input id="iCent" type="range" min="0" max="80" step="5" value="10" aria-label="Centrality percent">
@@ -179,6 +206,7 @@ input[type=checkbox]{accent-color:var(--amber)}
       <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
       <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
       <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
     </div>
   </section>
 </div>
@@ -260,6 +288,8 @@ const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, 4)
 const uT = uniform(0);          // track reveal path length (m)
 const uDet = uniform(1);
 const uFire = uniform(0);
+const uLight = uniform(0);       // 0 = dark theme, 1 = light theme
+const themed = [];               // additive materials that switch to normal blending on a light background
 
 /* ---------------- detector ---------------- */
 const det = new THREE.Group(); scene.add(det);
@@ -267,8 +297,9 @@ const det = new THREE.Group(); scene.add(det);
 function shellMat(hex, rim, base) {
   const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
   const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
-  m.colorNode = color(hex);
-  m.opacityNode = f.mul(rim).add(base).mul(uDet);
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = f.mul(rim).add(base).mul(uDet).mul(mix(float(1), float(1.6), uLight));
+  themed.push(m);
   return m;
 }
 function cyl(r, hl, mat, sides = 96) {
@@ -276,7 +307,13 @@ function cyl(r, hl, mat, sides = 96) {
   g.rotateX(Math.PI / 2);
   const m = new THREE.Mesh(g, mat); det.add(m); return m;
 }
-const lineMat = (hex, op) => new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+const lineMats = [];
+const lineMat = (hex, op) => {
+  const m = new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+  m.userData.base = { color: new THREE.Color(hex), opacity: op };
+  lineMats.push(m);
+  return m;
+};
 function polyLines(r, n, hl, rot, mat) {          // n-gon prism outline
   const v = [];
   for (let i = 0; i < n; i++) {
@@ -336,8 +373,9 @@ const calMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: 
   const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
   const tower = gridLine(uvT, 1.0).mul(fade);
   const module = gridLine(uvT.mul(0.5), 1.4);
-  calMat.colorNode = color('#c79bff');
-  calMat.opacityNode = float(0.03).add(tower.mul(0.17)).add(module.mul(0.24)).mul(uDet);
+  calMat.colorNode = mix(color('#c79bff'), color('#6a3fb8'), uLight);
+  calMat.opacityNode = float(0.03).add(tower.mul(0.17)).add(module.mul(0.24)).mul(uDet).mul(mix(float(1), float(1.5), uLight));
+  themed.push(calMat);
 }
 const calEdge = lineMat(0xc79bff, 0.42);
 for (const sm of SMS) {
@@ -378,7 +416,9 @@ const fireMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite:
 {
   const n = mx_noise_float(positionLocal.mul(3.2).add(vec3(0, 0, time.mul(1.4))));
   const core = abs(dot(normalView, positionViewDirection)).pow(1.6);
-  fireMat.colorNode = mix(color('#ff4a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7);
+  fireMat.colorNode = mix(mix(color('#ff4a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7),
+                          mix(color('#d92e00'), color('#ff9a1f'), core.add(n.mul(0.35)).clamp(0, 1)), uLight);
+  themed.push(fireMat);
   fireMat.opacityNode = uFire.mul(core.mul(0.85).add(0.12)).mul(n.mul(0.45).add(0.8));
 }
 const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 5), fireMat);
@@ -399,7 +439,8 @@ const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: 
   const head = exp(ahead.max(0).mul(-7)).mul(2.6).add(1);
   const rT = positionLocal.xy.length();
   const outer = mix(float(1), float(0.4), smoothstep(2.45, 2.65, rT));
-  trkMat.colorNode = attribute('tcol', 'vec3').mul(head);
+  trkMat.colorNode = attribute('tcol', 'vec3').mul(mix(head, float(0.72), uLight));
+  themed.push(trkMat);
   trkMat.opacityNode = step(pT, uT).mul(outer).mul(0.9);
 }
 const tracks = new THREE.LineSegments(trkGeo, trkMat); tracks.frustumCulled = false; scene.add(tracks);
@@ -412,7 +453,8 @@ hitGeo.setAttribute('hitT', hT); hitGeo.setAttribute('hcol', hC);
 const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 {
   const ht = attribute('hitT', 'float');
-  hitMat.colorNode = attribute('hcol', 'vec3').mul(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2));
+  hitMat.colorNode = attribute('hcol', 'vec3').mul(mix(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2), float(0.6), uLight));
+  themed.push(hitMat);
   hitMat.opacityNode = step(ht, uT);
 }
 const hits = new THREE.InstancedMesh(hitGeo, hitMat, MAXH); hits.count = 0; hits.frustumCulled = false;
@@ -473,7 +515,8 @@ const gMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: fa
   const pT = attribute('pathT', 'float');
   const dash = step(fract(pT.mul(12)), float(0.5));
   const head = exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1);
-  gMat.colorNode = color('#fff0b8').mul(attribute('gE', 'float')).mul(head);
+  gMat.colorNode = mix(color('#fff0b8').mul(attribute('gE', 'float')).mul(head), color('#9a6a00'), uLight);
+  themed.push(gMat);
   gMat.opacityNode = step(pT, uT).mul(dash).mul(0.9);
 }
 const gammas = new THREE.LineSegments(gGeo, gMat); gammas.frustumCulled = false; scene.add(gammas);
@@ -896,6 +939,24 @@ function setView(id, instant) {
 /* ---------------- UI wiring ---------------- */
 $('hudToggle').onclick = () => { const c = $('hud').classList.toggle('collapsed'); $('hudToggle').setAttribute('aria-expanded', !c); };
 $('bNext').onclick = newEvent;
+$('ctlToggle').onclick = () => { const c = $('controls').classList.toggle('collapsed'); $('ctlToggle').setAttribute('aria-expanded', !c); };
+
+/* ---------------- theme ---------------- */
+let lightTheme = false;
+function applyTheme(light) {
+  lightTheme = light;
+  document.documentElement.classList.toggle('light', light);
+  $('cLight').checked = light;
+  const bg = light ? 0xeef1f6 : 0x060a13;
+  renderer.setClearColor(bg, 1); scene.fog.color.setHex(bg);
+  uLight.value = light ? 1 : 0;
+  for (const m of themed) { m.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; m.needsUpdate = true; }
+  for (const m of lineMats) {
+    m.color.copy(m.userData.base.color).multiplyScalar(light ? 0.55 : 1);
+    m.opacity = Math.min(1, m.userData.base.opacity * (light ? 1.7 : 1));
+  }
+}
+$('cLight').onchange = e => applyTheme(e.target.checked);
 $('bReplay').onclick = replay;
 $('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? 'Play' : 'Pause'; $('bPause').setAttribute('aria-pressed', paused); };
 $('iCent').oninput = e => { $('oCent').textContent = `${e.target.value}–${+e.target.value + 5}%`; };
@@ -957,7 +1018,7 @@ renderer.setAnimationLoop(() => {
   }
   controls.update();
   if (!$('labels').hidden) placeLabels();
-  if (post) post.render(); else renderer.render(scene, camera);
+  if (post && !lightTheme) post.render(); else renderer.render(scene, camera);
   if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
 });
 
@@ -980,9 +1041,10 @@ function composeShot(done) {
   g.drawImage(src, 0, 0);                                    // same task as the render, so the frame is still valid
   const k = c.width / innerWidth, pad = 18 * k;
   g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
-  g.fillStyle = '#dfe6f3'; g.textBaseline = 'bottom';
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue('--ink').trim(); g.textBaseline = 'bottom';
   g.fillText('ALICE · Pb–Pb √sNN = 5.36 TeV · toy MC', pad, c.height - pad - 18 * k);
-  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = '#8796b1';
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = css.getPropertyValue('--muted').trim();
   g.fillText(`Event #${String(evNo).padStart(3, '0')} · centrality ${ev.c.toFixed(1)}% · b = ${ev.b.toFixed(2)} fm · Npart ${ev.npart} · ${ev.nTw} towers, ΣE ${ev.sumE.toFixed(0)} GeV`, pad, c.height - pad);
   c.toBlob(done, 'image/png');
 }
