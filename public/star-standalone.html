@@ -158,7 +158,7 @@ input[type=checkbox]{accent-color:var(--amber)}
         <li><i>Fixed target</i>: 0.25 mm Au foil at z = 200.7 cm, 2 cm below the beam axis; beam travels West→East, so the fireball is boosted by y<sub>CM</sub> into the TPC (STAR BES-II/FXT, STAR Note SN0598; STAR, PRC 103, 034908, 2021).</li>
         <li><i>Glauber MC</i>: Woods–Saxon Au (R = 6.38, a = 0.535 fm), Cu (4.20, 0.596), Ru (5.085, 0.46), Zr (5.02, 0.52), O (2.608, 0.513); Hulthén deuteron; σ<sub>NN</sub><sup>inel</sup>(√s) from 22 mb (3 GeV) to 42 mb (200 GeV) (Miller et al., Ann. Rev. Nucl. Part. Sci. 57, 205, 2007).</li>
         <li><i>Particles</i>: two-component dN/dη of mesons, n<sub>pp</sub>(√s) tuned to ≈ 690 for 0–5% Au+Au at 200 GeV (PHOBOS, PRC 83, 024913, 2011), Gaussian dN/dy with Landau width σ² = ln(√s/2m<sub>p</sub>). Participant protons with rapidity loss ≈ 2 units (full stopping at BES energies; STAR, PRC 96, 044904, 2017), light-nucleus (d) coalescence at low √s, K⁻/K⁺ and p̄/p rising with √s. v₂ from ε₂ with sign change below ≈ 4 GeV and proton v₁ slope at FXT energies (STAR, PLB 827, 137003, 2022).</li>
-        <li><i>Tracking</i>: helices in B = 0.5 T inside the magnet, straight beyond. Hits: TOF, eTOF, FST, FTT, EPD, VPD. Towers: BEMC, EEMC, FCS ECal (charged MIP / partial showers, γ from π⁰, η → γγ).</li>
+        <li><i>Tracking</i>: helices in B = 0.5 T inside the magnet, straight beyond. Hits: TOF, eTOF, FST, FTT, EPD, VPD. Towers: BEMC, EEMC, FCS ECal (22×34 × 5.5 cm per half) and HCal (13×20 × 10 cm per half). Charged hadrons leave MIP or partial EM showers; in the forward region they continue into the HCal (toy σ/E = 70%/√E). Neutral hadrons (participant neutrons, K⁰<sub>L</sub>) deposit mainly in the HCal; γ from π⁰, η → γγ. FCS ECal towers are drawn rising towards the IP, HCal towers away from it.</li>
       </ul>
     </details>
   </section>
@@ -547,7 +547,18 @@ const FCS = [1, -1].map(sg => addCal({
   surf: (u, v) => [sg * (FCS_X0 + u * FCS_C), -FCS_NR * FCS_C / 2 + v * FCS_C, FCS_Z],
   locate: (x, y) => [(sg * x - FCS_X0) / FCS_C, (y + FCS_NR * FCS_C / 2) / FCS_C],
   cell(iu, iv) {
-    return { c: new THREE.Vector3(...this.surf(iu + 0.5, iv + 0.5)), a: new THREE.Vector3(0, 0, 1), e1: new THREE.Vector3(1, 0, 0), e2: new THREE.Vector3(0, 1, 0), w1: 0.45 * FCS_C, w2: 0.45 * FCS_C };
+    // ECal towers rise from the front face towards the IP, so they do not run into the HCal
+    return { c: new THREE.Vector3(...this.surf(iu + 0.5, iv + 0.5)), a: new THREE.Vector3(0, 0, -1), e1: new THREE.Vector3(1, 0, 0), e2: new THREE.Vector3(0, 1, 0), w1: 0.45 * FCS_C, w2: 0.45 * FCS_C };
+  },
+}));
+const HCAL = [1, -1].map(sg => addCal({
+  name: 'HCal', nU: HCAL_NC, nV: HCAL_NR, mod: [1, 1], col: '#d9824a', res: [0.70, 0.08], sg,
+  surf: (u, v) => [sg * (HCAL_X0 + u * HCAL_C), -HCAL_NR * HCAL_C / 2 + v * HCAL_C, HCAL_Z],
+  locate: (x, y) => [(sg * x - HCAL_X0) / HCAL_C, (y + HCAL_NR * HCAL_C / 2) / HCAL_C],
+  cell(iu, iv) {
+    // HCal towers rise from the back face, away from the IP
+    const c = new THREE.Vector3(...this.surf(iu + 0.5, iv + 0.5)); c.z = HCAL_Z + HCAL_D;
+    return { c, a: new THREE.Vector3(0, 0, 1), e1: new THREE.Vector3(1, 0, 0), e2: new THREE.Vector3(0, 1, 0), w1: 0.45 * HCAL_C, w2: 0.45 * HCAL_C };
   },
 }));
 const towE = new Float32Array(NTOW), towT = new Float32Array(NTOW);
@@ -581,7 +592,7 @@ for (const cal of CALS) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uvT', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  det.add(new THREE.Mesh(g, calFaceMat(cal.col, cal.mod[0], cal.mod[1], cal === BEMC ? 0.35 : cal === EEMC ? 0.6 : 0.8)));
+  det.add(new THREE.Mesh(g, calFaceMat(cal.col, cal.mod[0], cal.mod[1], cal === BEMC ? 0.35 : cal === EEMC ? 0.6 : cal.name === 'HCal' ? 0.6 : 0.8)));
 }
 { // calorimeter outlines
   const bL = lineMat(0xc79bff, 0.32), v = [];
@@ -725,6 +736,28 @@ const gMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: fa
 }
 const gammas = new THREE.LineSegments(gGeo, gMat); gammas.frustumCulled = false; scene.add(gammas);
 
+/* ---------------- neutral hadrons (n, K⁰L): dotted, straight ---------------- */
+const MAXN = 5000;
+const nBuf = { position: new Float32Array(MAXN * 6), pathT: new Float32Array(MAXN * 2), nE: new Float32Array(MAXN * 2) };
+const nGeo = new THREE.BufferGeometry();
+const nAttr = {
+  position: new THREE.BufferAttribute(nBuf.position, 3).setUsage(THREE.DynamicDrawUsage),
+  pathT: new THREE.BufferAttribute(nBuf.pathT, 1).setUsage(THREE.DynamicDrawUsage),
+  nE: new THREE.BufferAttribute(nBuf.nE, 1).setUsage(THREE.DynamicDrawUsage),
+};
+for (const [k, a] of Object.entries(nAttr)) nGeo.setAttribute(k, a);
+nGeo.setDrawRange(0, 0);
+const nMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const dot = step(fract(pT.mul(6)), float(0.22));
+  const head = exp(uT.sub(pT).max(0).mul(-6)).mul(2.0).add(1);
+  nMat.colorNode = mix(color('#9fc3ff').mul(attribute('nE', 'float')).mul(head), color('#2f5aa0'), uLight);
+  themed.push(nMat);
+  nMat.opacityNode = step(pT, uT).mul(dot).mul(0.85);
+}
+const neutrals = new THREE.LineSegments(nGeo, nMat); neutrals.frustumCulled = false; scene.add(neutrals);
+
 /* ---------------- bloom ---------------- */
 let post = null;
 try {
@@ -804,7 +837,9 @@ function deposit(cal, x, y, z, E, tArr, sigma, nS) {
   return true;
 }
 const smear = (cal, E) => Math.max(0, E * (1 + gauss() * Math.hypot(cal.res[0] / Math.sqrt(Math.max(E, 0.05)), cal.res[1])));
-const fcsAt = (x, y) => FCS.find(c => { const [u, v] = c.locate(x, y); return u >= 0 && u < c.nU && v >= 0 && v < c.nV; });
+const calAt = (list, x, y) => list.find(c => { const [u, v] = c.locate(x, y); return u >= 0 && u < c.nU && v >= 0 && v < c.nV; });
+const fcsAt = (x, y) => calAt(FCS, x, y), hcalAt = (x, y) => calAt(HCAL, x, y);
+const hadSmear = E => Math.max(0, E * (1 + 0.7 / Math.sqrt(Math.max(E, 0.1)) * gauss()));
 
 // two-body decay M → γγ, isotropic in the rest frame, boosted to the lab
 function decayGG(m, E, px, py, pz) {
@@ -943,18 +978,19 @@ function generate(centPct) {
   const wA = npart ? npA / npart : 0.5;
   const yMes = () => (rnd() < wA ? 1 : -1) * 0.3 * K.sigY + K.sigY * gauss();
   let nPi0 = 0;
+  const nlist = [];                                               // neutral hadrons (K⁰L, n)
   for (let k = 0; k < nMes; k++) {
     const y = yMes();
     if (rnd() < 1 / 3) { nPi0++; continue; }                     // π⁰ (decayed below)
-    if (rnd() < K.fK * 1.5) emit(1, rnd() < 1 / (1 + K.rK) ? 1 : -1, y, false);
+    if (rnd() < K.fK * 1.5) { emit(1, rnd() < 1 / (1 + K.rK) ? 1 : -1, y, false); if (rnd() < 0.5) nlist.push({ m: 0.4976, theta: 0.36, y }); }
     else emit(0, rnd() < 0.5 * (1 - K.piAsym) ? 1 : -1, y, false);
     if (rnd() < K.fpp) { emit(2, 1, yMes(), true); emit(2, -1, yMes(), true); }
   }
   // participant protons with rapidity loss (stopping), coalesced deuterons
   let nPprot = 0;
   for (const n of parts) {
-    if (!n.prot) continue;
     const y = n.side * Math.max(0, K.yb - K.yLoss) + Math.min(0.9, 0.35 + 0.3 * K.yb) * gauss();
+    if (!n.prot) { nlist.push({ m: 0.9396, theta: 0.47, y: Math.max(-K.yb, Math.min(K.yb, y)) }); continue; }
     nPprot++;
     if (rnd() < K.fd) emit(3, 1, y * 0.9, true); else emit(2, 1, Math.max(-K.yb, Math.min(K.yb, y)), true);
   }
@@ -963,7 +999,7 @@ function generate(centPct) {
   const vx = 0, vy = K.fxt ? FXT_Y : 0;
   const vz = K.fxt ? FXT_Z + 0.002 * gauss() : THREE.MathUtils.clamp((rsSel < 100 ? 0.4 : 0.2) * gauss(), -0.7, 0.7);
   const trks = [];
-  let nv = 0, nh = 0, maxPath = 0, nTOF = 0, nEPD = 0, nTPC = 0, nPTPC = 0, nETOF = 0;
+  let nv = 0, nh = 0, maxPath = 0, nTOF = 0, nEPD = 0, nTPC = 0, nPTPC = 0, nETOF = 0, nHC = 0;
   const hitM = new THREE.Matrix4(), hq = new THREE.Quaternion(), hs = new THREE.Vector3(), hp = new THREE.Vector3();
   towE.fill(0); towT.fill(0);
   const addHit = (x, y, z, s, sc, tr) => {
@@ -982,8 +1018,9 @@ function generate(centPct) {
   const calDep = (cal, x, y, z, p, s, tr) => {
     const mip = rnd() < 0.62;
     const Edep = mip ? 0.26 * (1 + 0.12 * gauss()) : p * (0.15 + 0.5 * rnd());
-    return deposit(cal, x, y, z, Edep, s, mip ? 0.15 : 0.45, mip ? 3 : 12);
+    return deposit(cal, x, y, z, Edep, s, mip ? 0.15 : 0.45, mip ? 3 : 12) ? Edep : -1;
   };
+  const hcalDep = (h, E, s) => deposit(h.cal, h.x, h.y, HCAL_Z, hadSmear(E), s, 0.5, 10);
 
   for (const P of plist) {
     if (trks.length >= MAXTRK || nv + 4 > MAXV) break;
@@ -1044,9 +1081,15 @@ function generate(centPct) {
       const dx = Math.cos(alpha), dy = Math.sin(alpha), dz = sh;           // per unit transverse length
       const go = (Z) => { const t = (Z - z) / dz; return [x + dx * t, y + dy * t, Z, s3 + t * ch]; };
       if (z > 0) {
-        const f = go(FCS_Z), cal = fcsAt(f[0], f[1]);
-        if (cal) { pushSeg(x, y, z, s3, f[0], f[1], f[2], f[3]); calDep(cal, f[0], f[1], f[2], pt * ch, f[3], tr); s3 = f[3]; }
-        else { const v = go(VPD_Z), vr = Math.hypot(v[0], v[1]); if (vr > VPD_R0 && vr < VPD_R1) { pushSeg(x, y, z, s3, ...v); addHit(...v, 0.018, tr); s3 = v[3]; } }
+        const f = go(FCS_Z), cal = fcsAt(f[0], f[1]), hz = go(HCAL_Z), hc = hcalAt(hz[0], hz[1]);
+        if (cal || hc) {
+          let eE = 0;
+          if (cal) { pushSeg(x, y, z, s3, f[0], f[1], f[2], f[3]); eE = Math.max(0, calDep(cal, f[0], f[1], f[2], pt * ch, f[3], tr)); s3 = f[3]; x = f[0]; y = f[1]; z = f[2]; }
+          if (hc) {                                             // hadronic shower in the HCal (sampling ≈ 85%)
+            pushSeg(x, y, z, s3, hz[0], hz[1], hz[2], hz[3]); s3 = hz[3];
+            hcalDep({ cal: hc, x: hz[0], y: hz[1] }, 0.85 * Math.max(pt * ch - eE, 0), s3); nHC++;
+          }
+        } else { const v = go(VPD_Z), vr = Math.hypot(v[0], v[1]); if (vr > VPD_R0 && vr < VPD_R1) { pushSeg(x, y, z, s3, ...v); addHit(...v, 0.018, tr); s3 = v[3]; } }
       } else {
         const v = go(-VPD_Z), vr = Math.hypot(v[0], v[1]);
         if (vr > VPD_R0 && vr < VPD_R1) { pushSeg(x, y, z, s3, ...v); addHit(...v, 0.018, tr); s3 = v[3]; }
@@ -1091,10 +1134,43 @@ function generate(centPct) {
   }
   gGeo.setDrawRange(0, ng * 2);
   for (const a of Object.values(gAttr)) a.needsUpdate = true;
+
+  // ---- neutral hadrons (K⁰L, n): straight; partial shower in BEMC / EEMC, full shower in the FCS HCal
+  let nn = 0;
+  const NB_ = nBuf;
+  for (const N of nlist) {
+    if (nn >= MAXN) break;
+    const pt = samplePt(N.theta), yl = lab(N.y), phi = rnd() * 2 * Math.PI, mT = Math.hypot(N.m, pt);
+    const px = pt * Math.cos(phi), py = pt * Math.sin(phi), pz = mT * Math.sinh(yl), E = mT * Math.cosh(yl), Ek = E - N.m;
+    let t = BEMC_R / pt, X = vx + px * t, Y = vy + py * t, Z = vz + pz * t, ok = false;
+    if (Math.abs(Z) <= BEMC_ZF) ok = deposit(BEMC, X, Y, Z, Ek * (0.15 + 0.35 * rnd()), Math.hypot(X - vx, Y - vy, Z - vz), 0.6, 8);
+    else if (pz > 0) {
+      t = (EEMC_Z0 - vz) / pz; X = vx + px * t; Y = vy + py * t; Z = EEMC_Z0;
+      const r = Math.hypot(X, Y);
+      if (r > EEMC_RIN && r < EEMC_ROUT) ok = deposit(EEMC, X, Y, Z, Ek * (0.15 + 0.35 * rnd()), Math.hypot(X - vx, Y - vy, Z - vz), 0.6, 8);
+      else if (r < PT_RIN) {
+        t = (FCS_Z - vz) / pz; const fx = vx + px * t, fy = vy + py * t, fc = fcsAt(fx, fy);
+        let eE = 0;
+        if (fc) { eE = Ek * 0.12 * rnd(); deposit(fc, fx, fy, FCS_Z, eE, Math.hypot(fx - vx, fy - vy, FCS_Z - vz), 0.6, 6); }
+        t = (HCAL_Z - vz) / pz; X = vx + px * t; Y = vy + py * t; Z = HCAL_Z;
+        const hc = hcalAt(X, Y);
+        if (hc) { ok = hcalDep({ cal: hc, x: X, y: Y }, 0.85 * (Ek - eE), Math.hypot(X - vx, Y - vy, Z - vz)); nHC++; }
+      }
+    }
+    if (!ok) continue;
+    const L = Math.hypot(X - vx, Y - vy, Z - vz), o = nn * 6;
+    NB_.position.set([vx, vy, vz, X, Y, Z], o);
+    NB_.pathT[nn * 2] = 0; NB_.pathT[nn * 2 + 1] = L;
+    NB_.nE[nn * 2] = NB_.nE[nn * 2 + 1] = Math.min(0.3 + 0.08 * Ek, 1.6);
+    maxPath = Math.max(maxPath, L);
+    nn++;
+  }
+  nGeo.setDrawRange(0, nn * 2);
+  for (const a of Object.values(nAttr)) a.needsUpdate = true;
   const cal = buildTowers();
 
   ev = { K, sys: S_, NA, NB, b, c: c * 100, npart, ncoll, eps2, psi2, v2, nucleons, su, sv, mx, my, vx, vy, vz,
-         trks, nv, nh, ng, nTOF, nEPD, nETOF, nTPC, nPTPC, nPprot, nMes, ...cal, maxPath: Math.min(maxPath, 8.5),
+         trks, nv, nh, ng, nn, nHC, nTOF, nEPD, nETOF, nTPC, nPTPC, nPprot, nMes, ...cal, maxPath: Math.min(maxPath, 8.5),
          gVisA: Math.min(K.fxt ? K.gLab : K.gCM, 12), gVisB: K.fxt ? 1 : Math.min(K.gCM, 12) };
   trkGeo.setDrawRange(0, nv);
   hits.count = nh;
@@ -1172,7 +1248,7 @@ const PHASES = [
     ? `Pressure gradients convert ε₂ into in-plane flow, v₂ ≈ ${ev.v2.toFixed(3)}.${ev.K.v1p > 0.05 ? ` Strong directed flow of protons, dv₁/dy ≈ ${ev.K.v1p.toFixed(2)}.` : ''}`
     : `Spectator shadowing ("squeeze-out"): v₂ ≈ ${ev.v2.toFixed(3)} < 0; protons show strong directed flow, dv₁/dy ≈ ${ev.K.v1p.toFixed(2)}.`],
   [T0 + 3.0 / V_TRK, 'Tracking', () => `Helices in B = 0.5 T: R[m] = p_T/(0.3·B). ${ev.nTPC.toLocaleString()} tracks in the TPC${ev.K.fxt ? ' (boosted East by y_CM = ' + ev.K.yb.toFixed(2) + ')' : ''}; ${ev.nTOF} TOF${etofOn ? `, ${ev.nETOF} eTOF` : ''} and ${ev.nEPD} EPD hits.`],
-  [1e9, 'Calorimetry', () => `${ev.nTw.toLocaleString()} BEMC / EEMC / FCS towers above 100 MeV, ΣE = ${ev.sumE.toFixed(0)} GeV. Dashed: ${ev.ng} photons from π⁰, η → γγ.`],
+  [1e9, 'Calorimetry', () => `${ev.nTw.toLocaleString()} BEMC / EEMC / FCS ECal + HCal towers above 100 MeV, ΣE = ${ev.sumE.toFixed(0)} GeV. Dashed: ${ev.ng} photons from π⁰, η → γγ; dotted: ${ev.nn} neutral hadrons (n, K⁰L). ${ev.nHC} hadrons shower in the FCS HCal.`],
 ];
 let lastPhase = -1;
 function phaseUpdate(t) {
@@ -1226,7 +1302,7 @@ function legend() {
   el.insertAdjacentHTML('beforeend', `<h2 class="sub">BEMC / EEMC / FCS tower E (GeV)</h2>
     <div class="ramp" style="background:linear-gradient(90deg,${E_COLS.map(c => '#' + c.getHexString(THREE.SRGBColorSpace)).join(',')})"></div>
     <div class="ticks">${[0.1, 1, 10, 20].map(v => `<span style="left:${lg(v)}%">${v}</span>`).join('')}</div>
-    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key muted">height 10 cm/GeV</span></div>`);
+    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key"><i style="background:repeating-linear-gradient(90deg,#9fc3ff 0 2px,transparent 2px 6px)"></i>n, K⁰<sub>L</sub></span><span class="key muted">height 10 cm/GeV</span></div>`);
 }
 
 /* ---------------- labels ---------------- */
