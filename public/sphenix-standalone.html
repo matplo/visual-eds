@@ -120,6 +120,7 @@ input[type=checkbox]{accent-color:var(--amber)}
 </style>
 <style>
 #controls select{max-width:100%}
+.key i.cone{background:rgba(255,178,74,.55);height:8px;border-radius:1px}
 </style>
 
 <div id="app">
@@ -159,7 +160,7 @@ input[type=checkbox]{accent-color:var(--amber)}
         <li><i>Calorimetry</i>, |η| &lt; 1.1, full φ: EMCal W/SciFi SPACAL, r ≈ 0.90–1.16 m, 256 φ × 96 η towers of Δη×Δφ ≈ 0.024×0.024, 18 X₀, σ<sub>E</sub>/E ≈ 14%/√E ⊕ 3% here (Aidala et al., IEEE TNS 65, 2901, 2018, arXiv:1704.01461). Inner HCal (Al, inside the cryostat) r ≈ 1.16–1.37 m and Outer HCal (steel, also the flux return) r ≈ 1.82–2.69 m, each 24 η × 64 φ towers of 0.1×0.1 with tilted plates; ≈ 4.9 λ<sub>I</sub> total (sPHENIX TDR, 2019).</li>
         <li><i>Forward / trigger</i>: MBD (Minimum-Bias Detector, ex-PHENIX BBC) 2 × 64 quartz + PMT at |z| = 2.50 m, 3.61 &lt; |η| &lt; 4.51. sEPD (sPHENIX Event-Plane Detector) 2 scintillator wheels at |z| ≈ 3.16 m, 2.0 &lt; |η| &lt; 4.9, 24 sectors × 31 tiles drawn as 16 rings. ZDCs at ±18 m behind the DX magnets (arXiv:2410.18031). Dimensions are approximate published values, not the GEANT4 geometry.</li>
         <li><i>Glauber MC</i>: Woods–Saxon Au (R = 6.38, a = 0.535 fm), σ<sub>NN</sub><sup>inel</sup> = 42 mb (Miller et al., Ann. Rev. Nucl. Part. Sci. 57, 205, 2007). Bulk: two-component dN/dη tuned to ≈ 690 for 0–5% Au+Au (PHOBOS, PRC 83, 024913, 2011), ≈ 2.3 in p+p; v₂ from ε₂.</li>
-        <li><i>Hard probes</i> (embedded): dijet with leading p<sub>T</sub> 15–45 GeV, toy fragmentation (≈ 60% charged, 30% π⁰ → γγ, 10% n/K⁰<sub>L</sub>); in Au+Au the recoil jet loses energy with centrality and radiates soft particles at large angle, giving x<sub>J</sub> imbalance (qualitatively after ATLAS, PRL 105, 252303, 2010). Υ(1S) → e⁺e⁻ (m = 9.46 GeV), |y| &lt; 1.</li>
+        <li><i>Hard probes</i> (embedded): dijet with leading p<sub>T</sub> 15–45 GeV, toy fragmentation (≈ 60% charged, 30% π⁰ → γγ, 10% n/K⁰<sub>L</sub>); in Au+Au the recoil jet loses energy with centrality and radiates soft particles at large angle, giving x<sub>J</sub> imbalance (qualitatively after ATLAS, PRL 105, 252303, 2010). Υ(1S) → e⁺e⁻ (m = 9.46 GeV), |y| &lt; 1. Jet cones drawn with R = 0.4.</li>
         <li><i>Response</i>: helices in uniform 1.4 T up to the EMCal face (R[m] = p<sub>T</sub>/(0.42·GeV)); e/γ shower in the EMCal; hadrons start a shower in the EMCal with P ≈ 1 − e<sup>−0.83</sup>, otherwise leave a MIP and shower in the iHCal / oHCal. Toy shares, not a GEANT simulation.</li>
       </ul>
     </details>
@@ -232,6 +233,7 @@ input[type=checkbox]{accent-color:var(--amber)}
     </div>
     <div class="grp">
       <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cJet" type="checkbox" checked>Jet cones</label>
       <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
       <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
       <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
@@ -326,6 +328,7 @@ const uT = uniform(0);
 const uDet = uniform(1);
 const uFire = uniform(0);
 const uLight = uniform(0);
+const uJet = uniform(0);
 const uTrkOp = uniform(0.9);
 const themed = [];
 
@@ -541,6 +544,26 @@ for (const s of [-1, 1]) {
 // --- ZDCs (±18 m)
 for (const s of [-1, 1]) box(0, 0, s * (ZDC_Z + 0.5), 0.10, 0.10, 1.0, 0, lineMat(0x9fb7e0, 0.4), faceMat('#9fb7e0', 0.05));
 
+/* ---------------- jet cones (R = 0.4) ---------------- */
+const jetMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+{
+  const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(2);
+  jetMat.colorNode = mix(color('#ffb24a'), color('#b86400'), uLight);
+  jetMat.opacityNode = f.mul(0.22).add(0.03).mul(uJet);
+  themed.push(jetMat);
+}
+const jetG = new THREE.Group(); scene.add(jetG);
+const jetCones = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.BufferGeometry(), jetMat); m.visible = false; jetG.add(m); return m; });
+function placeCone(m, J, vtx) {
+  const ch = Math.cosh(J.eta), half = 0.4 / ch, L = IH_R1 * ch;
+  m.geometry.dispose();
+  const g = new THREE.ConeGeometry(L * Math.tan(half), L, 48, 1, true); g.translate(0, -L / 2, 0);
+  m.geometry = g;
+  const d = new THREE.Vector3(Math.cos(J.phi), Math.sin(J.phi), Math.sinh(J.eta)).normalize();
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), d);
+  m.position.copy(vtx); m.visible = true;
+}
+
 /* ---------------- nuclei (instanced nucleons) ---------------- */
 const NUC = 400;
 const nucMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.4, metalness: 0.15 });
@@ -718,7 +741,7 @@ function trackColor(tr, mode) {
 }
 
 let ev = null, evNo = 0;
-let colorMode = 'pt', probe = 'dijet';
+let colorMode = 'pt', probe = 'dijet', showJets = true;
 let sysKey = 'AuAu';
 
 /* ---------------- calorimeter response ---------------- */
@@ -1050,6 +1073,8 @@ function generate(centPct) {
   const cal = buildTowers();
   maxPath += 0.6;                                                          // HCal tower stagger
 
+  const vtx = new THREE.Vector3(vx, vy, vz);
+  jetCones.forEach((m, i) => { if (jets[i]) placeCone(m, jets[i], vtx); else m.visible = false; });
 
   ev = { K, sys: S_, NA, NB, isPP, b, c: c * 100, npart, ncoll, eps2, psi2, v2, nucleons, su, sv, mx, my, vx, vy, vz,
          trks, nv, nh, ng, nMBD, nEPD, nTPC, nSi, nIntt, nTpot, nMes, jets, ups, ...cal, maxPath: Math.min(maxPath, 4.5),
@@ -1164,8 +1189,9 @@ function stats() {
 function newEvent() {
   generate(+$('iCent').value);
   simT = -1.7; lastPhase = -1; stats();
+  uT.value = 0; uJet.value = 0; uFire.value = 0;                     // reset time-driven uniforms immediately
 }
-function replay() { simT = -1.7; lastPhase = -1; }
+function replay() { simT = -1.7; lastPhase = -1; uT.value = 0; uJet.value = 0; }
 
 /* ---------------- legend ---------------- */
 function legend() {
@@ -1190,7 +1216,7 @@ function legend() {
   el.insertAdjacentHTML('beforeend', `<h2 class="sub">EMCal / iHCal / oHCal tower E (GeV)</h2>
     <div class="ramp" style="background:linear-gradient(90deg,${E_COLS.map(hx).join(',')})"></div>
     <div class="ticks">${[0.1, 1, 10, 20].map(v => `<span style="left:${lg(v)}%">${v}</span>`).join('')}</div>
-    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key muted">height ∝ log E · HCal threshold 2×</span></div>`);
+    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key"><i class="cone"></i>jet, R = 0.4</span><span class="key muted">height ∝ log E · HCal threshold 2×</span></div>`);
 }
 
 /* ---------------- labels ---------------- */
@@ -1289,6 +1315,7 @@ $('iColor').onchange = e => { colorMode = e.target.value; recolor(); };
 $('iThr').onchange = e => { E_THR = +e.target.value; Object.assign(ev, buildTowers()); stats(); lastPhase = -1; };
 $('iSpeed').oninput = e => { speed = +e.target.value; $('oSpeed').textContent = speed.toFixed(1) + '×'; };
 $('cDet').onchange = e => { det.visible = e.target.checked; };
+$('cJet').onchange = e => { showJets = e.target.checked; jetG.visible = showJets; };
 $('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
 $('cLoop').onchange = e => { autoLoop = e.target.checked; };
 $('cRot').onchange = e => { controls.autoRotate = e.target.checked; };
@@ -1341,11 +1368,13 @@ let shotReq = null;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
   if (!paused) simT += dt * speed;
+  // start the next event BEFORE any per-frame state is derived, so no frame shows the new geometry at the old time
+  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();
   updateNuclei(simT);
   updateFire(simT);
   uT.value = Math.max(0, simT - T0) * V_TRK;
+  uJet.value = ev.jets.length ? THREE.MathUtils.smoothstep(uT.value, 1.0, 2.0) : 0;
   phaseUpdate(simT);
-  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();
   if (tween) {
     tween.t = Math.min(1, tween.t + dt / 0.9);
     const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
