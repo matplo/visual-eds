@@ -1,0 +1,1354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DiCE Event Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGPU event display; glass HUD top-left, legend top-right, control rail at the bottom. Single dark theme (event-display convention). */
+:root{
+  color-scheme: dark;
+  --void:#060a13;
+  --panel:rgba(9,15,28,.74);
+  --ink:#dfe6f3;
+  --muted:#8796b1;
+  --line:rgba(140,165,205,.20);
+  --amber:#ffb24a;
+  --steel:#6f8db8;
+  --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+body{margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:12px}
+#app{position:fixed;inset:0}
+#app canvas{display:block;width:100%;height:100%;touch-action:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.lbl b{color:var(--ink);font-weight:500}
+.lbl.pb{color:var(--amber);border-bottom-color:var(--amber);text-transform:none}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#hud{top:calc(16px + env(safe-area-inset-top,0px));left:16px;width:min(340px,calc(100% - 32px));padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 170px);overflow:auto}
+.eyebrow{font:500 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--amber)}
+h1{margin:0;font:600 30px/1 var(--display);letter-spacing:.01em;text-wrap:balance}
+#hudToggle{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;border-radius:3px}
+#hudToggle:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.chev{font-size:16px;color:var(--muted);transition:transform .2s}
+#hud.collapsed .chev{transform:rotate(-90deg)}
+.hud-body{display:flex;flex-direction:column;gap:10px}
+#hud.collapsed .hud-body,#hud.collapsed details{display:none}
+.beam{color:var(--muted);font-size:11px;line-height:1.45}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;margin:0}
+.stats div{min-width:0}
+.stats dt{font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.stats dd{margin:2px 0 0;font:600 19px/1.1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.phase{border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:3px}
+#phaseName{font:600 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+#phaseNote{color:var(--muted);font-size:11px;line-height:1.45}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;color:var(--muted);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+summary:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+details p,details li{color:var(--muted);font-size:10.5px;line-height:1.5;margin:6px 0 0}
+details ul{margin:4px 0 0;padding-left:16px}
+details i{color:var(--ink);font-style:normal}
+details a{color:var(--ink)}
+#legend{top:calc(16px + env(safe-area-inset-top,0px));right:16px;padding:10px 12px;width:226px}
+#legend h2{margin:0 0 8px;font:500 10.5px/1.2 var(--mono);letter-spacing:.03em;color:var(--muted)}
+#legend h2.sub{margin-top:12px}
+#legend .keys{margin-top:6px}
+.ramp{height:8px;border-radius:2px}
+.ticks{position:relative;height:14px;margin-top:4px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.ticks span:first-child{transform:none}
+.ticks span:last-child{transform:translateX(-100%)}
+.keys{display:flex;flex-wrap:wrap;gap:6px 12px}
+.keys.col{flex-direction:column;gap:5px}
+.key{display:flex;align-items:center;gap:6px}
+.key i{width:14px;height:3px;border-radius:2px;display:inline-block;flex:none}
+.key.muted{color:var(--muted)}
+.zoom output{min-width:19ch}
+#controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grp>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:rgba(120,150,200,.10);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
+select option{background:#0d1526}
+button:hover,select:hover{border-color:var(--steel)}
+button.primary{background:var(--amber);color:#1a1205;border-color:var(--amber);font-weight:600}
+button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+input[type=range]{accent-color:var(--amber);width:110px}
+input[type=range]:disabled{opacity:.35}
+output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
+label.chk{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--ink)}
+input[type=checkbox]{accent-color:var(--amber)}
+#fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-inline:16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+@media (max-width:720px){
+  #legend{display:none}
+  #hud{padding:10px 12px;gap:7px}
+  h1{font-size:22px}
+  .stats dd{font-size:16px}
+  .hide-sm{display:none}
+  #controls{gap:8px 12px}
+  input[type=range]{width:90px}
+}
+@media (max-height:620px){ details{display:none} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="labels"></div>
+
+  <section class="panel collapsed" id="hud" aria-label="Event summary">
+    <div class="eyebrow">CERN SPS · fixed target · toy MC</div>
+    <h1><button id="hudToggle" type="button" aria-expanded="false" aria-controls="hudBody">DiCE Event Display<span class="chev" aria-hidden="true">▾</span></button></h1>
+    <div id="hudBody" class="hud-body">
+    <div class="beam" id="beamLine">—</div>
+    <dl class="stats">
+      <div><dt>Event</dt><dd id="sEv">—</dd></div>
+      <div><dt>√s<sub>NN</sub> (GeV)</dt><dd id="sS">—</dd></div>
+      <div><dt>Centrality</dt><dd id="sCent">—</dd></div>
+      <div><dt>b (fm)</dt><dd id="sB">—</dd></div>
+      <div><dt>N<sub>part</sub></dt><dd id="sNp">—</dd></div>
+      <div><dt>N<sub>coll</sub></dt><dd id="sNc">—</dd></div>
+      <div><dt>N<sub>ch</sub> (all y)</dt><dd id="sNch">—</dd></div>
+      <div class="hide-sm"><dt>VT tracks ≥4 hits</dt><dd id="sVT">—</dd></div>
+      <div class="hide-sm"><dt>⟨N<sub>cc̄</sub>⟩ natural</dt><dd id="sNcc">—</dd></div>
+      <div><dt>Charm L (mm)</dt><dd id="sL">—</dd></div>
+      <div class="hide-sm"><dt>μ DCA (µm)</dt><dd id="sDca">—</dd></div>
+      <div><dt>μ triggered</dt><dd id="sMu">—</dd></div>
+      <div class="hide-sm"><dt>μ from π/K</dt><dd id="sBkg">—</dd></div>
+      <div><dt>M<sub>μμ</sub> (GeV)</dt><dd id="sM">—</dd></div>
+      <div class="hide-sm"><dt>Signal tries</dt><dd id="sTry">—</dd></div>
+    </dl>
+    </div>
+    <div class="phase" aria-live="polite">
+      <span id="phaseName">Loading</span>
+      <span id="phaseNote">Initialising the renderer…</span>
+    </div>
+    <details>
+      <summary>Model &amp; references</summary>
+      <ul>
+        <li><i>Experiment</i>: DiCE (DiMuon and Charm Experiment, formerly NA60+) at the SPS (Super Proton Synchrotron), H8 line / EHN1: Pb beams 20–150 A GeV/c (√s<sub>NN</sub> ≈ 6.3–16.8 GeV), p beams 40–150 GeV/c on Be…Pb; ≈ 10⁶ Pb/s, ≈ 150 kHz Pb–Pb interaction rate. NA60+ LoI, <a href="https://arxiv.org/abs/2212.14452" target="_blank" rel="noopener">arXiv:2212.14452</a>; proposal <a href="https://cds.cern.ch/record/2932302" target="_blank" rel="noopener">CERN-SPSC-P-373</a>; <a href="https://indico.cern.ch/event/1703519/" target="_blank" rel="noopener">CERN detector seminar (2026)</a>.</li>
+        <li><i>Targets</i>: 5 Pb disks, 1.5 mm thick, 12 mm apart (first Ø 6 mm, others Ø 1 mm), ≈ 15% interaction probability; the vertex is drawn on one disk at random.</li>
+        <li><i>VT</i> (vertex telescope): 5 MAPS (monolithic active pixel sensor) planes at z = 7–38 cm, 30×30 cm with a 6 mm beam hole, ≈ 0.1–0.2% X₀ per plane, MOSAIX wafer-scale sensors (65 nm, from ALICE ITS3 R&amp;D). Inside the MEP48 dipole: 1.47 T, 40 cm gap, Ø 1 m poles; B ∥ y, so tracks bend in x (use the Top view).</li>
+        <li><i>Absorber</i>: BeO → Al₂O₃ → graphite, from z = 45 cm, with a tungsten plug on axis that stops the beam and spectators. Drawn lengths (0.6 / 0.3 / 2.65 m) are approximate; the real graphite length changes with beam energy.</li>
+        <li><i>MS</i> (muon spectrometer): 6 MWPC (multi-wire proportional chamber) stations, MS0–MS1 before and MS2–MS3 after the MNP33 dipole (0.9 T·m, 2.45 × 2.4 m aperture), MS4–MS5 behind a graphite muon wall. Station z positions and sizes are approximate. A muon counts as triggered if it hits ≥ 5 stations, including MS4/5.</li>
+        <li><i>Muon transport</i>: helix steps in B<sub>y</sub>; continuous dE/dx (≈ 1.2× minimum ionising) and Highland multiple scattering (θ₀ = 13.6 MeV/p·√(x/X₀)) in the absorber and wall (PDG RPP, PRD 110, 030001, 2024). Hadrons are absorbed after an exponential path in λ<sub>I</sub>; π, K can decay to μν first (the main single-μ background).</li>
+        <li><i>Glauber MC</i>: Pb Woods–Saxon R = 6.62 fm, a = 0.546 fm; ⁹Be Gaussian, rms 2.5 fm; σ<sub>NN</sub><sup>inel</sup> ≈ 30–33 mb. Review: Miller et al., Ann. Rev. Nucl. Part. Sci. 57, 205 (2007).</li>
+        <li><i>Underlying event</i> (UE): dN<sub>ch</sub>/dη per participant pair ∝ s<sup>0.155</sup> (cf. ALICE, PRL 116, 222302, 2016), Gaussian rapidity width σ<sub>y</sub> = √ln(√s/2m<sub>p</sub>) (Landau), π/K/p with mass-ordered slopes and a double-humped proton y-distribution (baryon stopping). Toy, not a transport model.</li>
+        <li><i>Charm</i>: σ<sub>cc̄</sub><sup>NN</sup> ≈ 4.4 µb at √s = 16.8 GeV, falling to ≈ 0.3 µb at 6.3 GeV (rough interpolation; cf. Lourenço &amp; Wöhri, Phys. Rept. 433, 127, 2006), ⟨N<sub>cc̄</sub>⟩ = σ<sub>cc̄</sub>/σ<sub>NN</sub>·N<sub>coll</sub>. Fragmentation D⁰ : D⁺ : D<sub>s</sub> : Λ<sub>c</sub> ≈ 56 : 24 : 10 : 10; dN/dm<sub>T</sub> ∝ m<sub>T</sub>e<sup>−m<sub>T</sub>/T</sup>, T = 0.27 GeV. Masses, cτ and branching fractions from PDG 2024. Semi-muonic decays use 3-body phase space (no form factors).</li>
+        <li><i>Signal forcing</i>: charm is rare (≈ 0.1 cc̄ per central Pb–Pb collision at top energy), so the chosen signal is generated until it is in acceptance and embedded in a minimum-bias UE. "Signal tries" is that number. M<sub>μμ</sub> is smeared with σ<sub>M</sub>/M = 1.1% (11 MeV at ω, 33 MeV at J/ψ).</li>
+        <li><i>Freeze-out</i>: T<sub>ch</sub>, μ<sub>B</sub> from the parametrisation of Cleymans et al., PRC 73, 034905 (2006).</li>
+        <li><i>Scale</i>: nuclei drawn at true size by default; Nuclei zoom magnifies them (and the fireball). Projectile contraction drawn at min(γ, 12); the target nucleus is at rest and stays spherical.</li>
+      </ul>
+    </details>
+  </section>
+
+  <aside class="panel" id="legend" aria-label="Colour legend"></aside>
+
+  <section class="panel" id="controls" aria-label="Controls">
+    <div class="grp">
+      <button id="bNext" class="primary">New event</button>
+      <button id="bReplay">Replay</button>
+      <button id="bPause" aria-pressed="false">Pause</button>
+      <button id="bShot" hidden>Save screenshot</button>
+    </div>
+    <div class="grp">
+      <span>System</span>
+      <select id="iSys" aria-label="Collision system">
+        <option value="PbPb">Pb–Pb</option>
+        <option value="pPb">p–Pb</option>
+        <option value="pBe">p–Be</option>
+      </select>
+      <select id="iE" aria-label="Beam momentum"></select>
+    </div>
+    <div class="grp">
+      <span>Signal</span>
+      <select id="iSig" aria-label="Heavy-flavour signal">
+        <option value="cmumu">cc̄ → μ⁺μ⁻ X</option>
+        <option value="jpsi">J/ψ → μ⁺μ⁻</option>
+        <option value="dkpi">D⁰ → K⁻π⁺ (VT)</option>
+        <option value="mb">Minimum bias</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>Centrality</span>
+      <input id="iCent" type="range" min="0" max="80" step="5" value="0" aria-label="Centrality percent">
+      <output id="oCent">0–5%</output>
+    </div>
+    <div class="grp">
+      <span>Colour</span>
+      <select id="iColor" aria-label="Track colour mode">
+        <option value="origin">Origin</option>
+        <option value="pt">pT</option>
+        <option value="charge">Charge</option>
+        <option value="species">Species</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>View</span>
+      <button id="v3d" aria-pressed="true">3D</button>
+      <button id="vTop" aria-pressed="false">Top</button>
+      <button id="vSide" aria-pressed="false">Side</button>
+      <button id="vVtx" aria-pressed="false">Vertex</button>
+      <button id="vVT" aria-pressed="false">VT</button>
+      <button id="vBeam" aria-pressed="false">Beam axis</button>
+    </div>
+    <div class="grp zoom">
+      <span>Nuclei zoom</span>
+      <input id="iZoom" type="range" min="0" max="13.5" step="0.01" value="0" aria-label="Nuclei magnification, log10 scale">
+      <output id="oZoom">1× (true size)</output>
+    </div>
+    <div class="grp">
+      <span>Speed</span>
+      <input id="iSpeed" type="range" min="0.2" max="10" step="0.1" value="2" aria-label="Playback speed">
+      <output id="oSpeed">2.0×</output>
+    </div>
+    <div class="grp">
+      <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
+      <label class="chk"><input id="cUE" type="checkbox" checked>Bulk hadrons</label>
+      <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
+      <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
+  </section>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.tsl.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three/webgpu';
+import { uniform, attribute, float, vec3, color, mix, step, smoothstep, exp, abs, dot, fract, fwidth, min, max,
+         positionLocal, normalView, positionViewDirection, mx_noise_float, time, pass } from 'three/tsl';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+/* ==== PHYSICS BEGIN ==== (pure JS, no three.js: fixed-target Glauber, heavy-flavour signal, tracking through VT / absorber / MS) */
+const PHYS = (() => {
+  const MN = 0.938272, TWO_PI = 2 * Math.PI;
+  const rnd = Math.random;
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(TWO_PI * rnd());
+  const poisson = mu => { const L = Math.exp(-mu); let k = 0, p = 1; do { k++; p *= rnd(); } while (p > L && k < 500); return k - 1; };
+
+  /* ---- particles (PDG 2024: masses GeV, cτ m) ---- */
+  const P = {
+    'pi+': { m: 0.13957, q: 1, sp: 'pi', ctau: 7.8045, name: 'π⁺' }, 'pi-': { m: 0.13957, q: -1, sp: 'pi', ctau: 7.8045, name: 'π⁻' },
+    'K+': { m: 0.493677, q: 1, sp: 'K', ctau: 3.7112, name: 'K⁺' }, 'K-': { m: 0.493677, q: -1, sp: 'K', ctau: 3.7112, name: 'K⁻' },
+    'p': { m: MN, q: 1, sp: 'p', name: 'p' }, 'pbar': { m: MN, q: -1, sp: 'p', name: 'p̄' },
+    'mu+': { m: 0.1056584, q: 1, sp: 'mu', name: 'μ⁺' }, 'mu-': { m: 0.1056584, q: -1, sp: 'mu', name: 'μ⁻' },
+    'K0': { m: 0.497611, q: 0, name: 'K⁰' }, 'K0bar': { m: 0.497611, q: 0, name: 'K̄⁰' },
+    'Lam': { m: 1.115683, q: 0, name: 'Λ' }, 'Lambar': { m: 1.115683, q: 0, name: 'Λ̄' },
+    'pi0': { m: 0.134977, q: 0, name: 'π⁰' }, 'phi': { m: 1.019461, q: 0, name: 'φ' },
+    'nu': { m: 0, q: 0, name: 'ν' }, 'nubar': { m: 0, q: 0, name: 'ν̄' },
+  };
+  const CONJ = { 'pi+': 'pi-', 'pi-': 'pi+', 'K+': 'K-', 'K-': 'K+', 'p': 'pbar', 'pbar': 'p', 'mu+': 'mu-', 'mu-': 'mu+',
+    'K0': 'K0bar', 'K0bar': 'K0', 'Lam': 'Lambar', 'Lambar': 'Lam', 'nu': 'nubar', 'nubar': 'nu', 'pi0': 'pi0', 'phi': 'phi' };
+  // charm hadrons (c-quark state; the c̄ partner is the charge conjugate). frac = c → hadron fragmentation (approximate)
+  const HF = [
+    { key: 'D0',  name: 'D⁰',   bar: 'D̄⁰',  m: 1.86484, ctau: 122.9e-6, q: 0, frac: 0.56, semi: 0.067, mu: ['K-', 'mu+', 'nu'],   had: [[['K-', 'pi+'], 0.4], [['K-', 'pi+', 'pi0'], 0.6]] },
+    { key: 'D+',  name: 'D⁺',   bar: 'D⁻',   m: 1.86966, ctau: 311.8e-6, q: 1, frac: 0.24, semi: 0.176, mu: ['K0bar', 'mu+', 'nu'], had: [[['K-', 'pi+', 'pi+'], 1]] },
+    { key: 'Ds+', name: 'D⁺ₛ',  bar: 'D⁻ₛ',  m: 1.96835, ctau: 151.2e-6, q: 1, frac: 0.10, semi: 0.055, mu: ['phi', 'mu+', 'nu'],   had: [[['K+', 'K-', 'pi+'], 1]] },
+    { key: 'Lc+', name: 'Λ⁺c',  bar: 'Λ̄⁻c',  m: 2.28646, ctau: 60.7e-6,  q: 1, frac: 0.10, semi: 0.035, mu: ['Lam', 'mu+', 'nu'],   had: [[['p', 'K-', 'pi+'], 1]] },
+  ];
+  const JPSI = { m: 3.0969, name: 'J/ψ' };
+
+  /* ---- systems & beams ---- */
+  const SYSTEMS = {
+    PbPb: { Ap: 208, At: 208, name: 'Pb–Pb', proj: '²⁰⁸Pb', targ: 'Pb', energies: [20, 30, 40, 50, 80, 150], def: 150, unit: 'A GeV/c' },
+    pPb:  { Ap: 1,   At: 208, name: 'p–Pb',  proj: 'p',     targ: 'Pb', energies: [40, 85, 150], def: 150, unit: 'GeV/c' },
+    pBe:  { Ap: 1,   At: 9,   name: 'p–Be',  proj: 'p',     targ: 'Be', energies: [40, 85, 150], def: 150, unit: 'GeV/c' },
+  };
+
+  /* ---- geometry (metres, z along the beam, 0 = most downstream target disk; approximate DiCE/NA60+ layout) ---- */
+  const TGT_Z = [-0.048, -0.036, -0.024, -0.012, 0.0];                 // 5 Pb disks, 12 mm apart, 1.5 mm thick
+  const VT_Z = [0.07, 0.1475, 0.225, 0.3025, 0.38], VT_H = 0.15, VT_HOLE = 0.003;
+  const MEP = { zc: 0.17, R: 0.5, gapH: 0.2, B: 1.47 };                 // MEP48: round poles Ø 1 m, 40 cm gap
+  const ABS = [                                                          // dE/dx for few-GeV μ (≈1.2× min. ionising), X0, λ_I
+    { name: 'BeO',   z0: 0.45, z1: 1.05, dEdx: 0.59, X0: 0.137, lam: 0.27 },
+    { name: 'Al₂O₃', z0: 1.05, z1: 1.35, dEdx: 0.79, X0: 0.070, lam: 0.23 },
+    { name: 'C',     z0: 1.35, z1: 4.00, dEdx: 0.38, X0: 0.237, lam: 0.48 },
+  ];
+  const ABS_Z0 = 0.45, ABS_Z1 = 4.0;
+  const absH = z => 0.30 * z + 0.06;                                     // lateral half size of the absorber
+  const plugR = z => 0.006 + 0.03 * (z - ABS_Z0);                        // tungsten beam plug radius
+  const W = { dEdx: 2.2, X0: 0.0035, lam: 0.10 };
+  const MS_Z = [4.25, 4.85, 8.6, 9.2, 11.6, 12.2];
+  const msHx = z => Math.min(3.0, 0.23 * z + 0.1), msHy = z => Math.min(2.8, 0.20 * z + 0.1), msHole = z => 0.028 * z;
+  const MNP = { z0: 5.25, z1: 8.25, hx: 1.225, hy: 1.2, B: 0.30 };       // MNP33: 0.9 T·m, 2.45 × 2.4 m aperture
+  const WALL = { name: 'C', z0: 9.5, z1: 11.3, dEdx: 0.38, X0: 0.237, lam: 0.48 };
+  const Z_END = 12.4;
+
+  function By(x, y, z) {
+    let b = 0;
+    if (Math.abs(y) < MEP.gapH + 0.05) {
+      const rr = Math.hypot(x, z - MEP.zc), fr = 0.12;
+      if (rr < MEP.R) b += MEP.B; else if (rr < MEP.R + fr) b += MEP.B * 0.5 * (1 + Math.cos(Math.PI * (rr - MEP.R) / fr));
+    }
+    if (z > MNP.z0 - 0.3 && z < MNP.z1 + 0.3 && Math.abs(x) < MNP.hx && Math.abs(y) < MNP.hy) {
+      const e = Math.min(z - (MNP.z0 - 0.3), MNP.z1 + 0.3 - z);
+      b += MNP.B * (e > 0.6 ? 1 : 0.5 * (1 - Math.cos(Math.PI * e / 0.6)));
+    }
+    return b;
+  }
+  function material(x, y, z) {                     // null = vacuum/air
+    if (z >= ABS_Z0 && z < ABS_Z1) {
+      if (Math.hypot(x, y) < plugR(z)) return W;
+      for (const a of ABS) if (z < a.z1) return a;
+    }
+    if (z >= WALL.z0 && z < WALL.z1) return WALL;
+    return null;
+  }
+  function outside(x, y, z) {                      // left the instrumented volume sideways
+    const ax = Math.abs(x), ay = Math.abs(y);
+    if (z < ABS_Z0) return ax > 0.6 || ay > 0.35 || z < -0.15;
+    if (z < ABS_Z1) return ax > absH(z) || ay > absH(z);
+    if (z >= MNP.z0 && z < MNP.z1) return ax > MNP.hx || ay > MNP.hy;
+    return ax > msHx(z) + 0.2 || ay > msHy(z) + 0.2;
+  }
+
+  /* ---- shared buffers ---- */
+  const MAXTRK = 3200, MAXV = 700000, MAXH = 16000, MAXD = 400;
+  const G = {
+    tPos: new Float32Array(MAXV * 3), tPath: new Float32Array(MAXV),
+    hPos: new Float32Array(MAXH * 3), hT: new Float32Array(MAXH), hS: new Float32Array(MAXH),
+    dPos: new Float32Array(MAXD * 3), dPath: new Float32Array(MAXD), dKind: new Float32Array(MAXD),
+    nv: 0, nh: 0, nd: 0, maxPath: 0,
+  };
+  function addSeg(a, s0, b, s1) {
+    if (G.nv + 2 > MAXV) return false;
+    const o = G.nv * 3;
+    G.tPos[o] = a[0]; G.tPos[o + 1] = a[1]; G.tPos[o + 2] = a[2]; G.tPath[G.nv] = s0;
+    G.tPos[o + 3] = b[0]; G.tPos[o + 4] = b[1]; G.tPos[o + 5] = b[2]; G.tPath[G.nv + 1] = s1;
+    G.nv += 2; return true;
+  }
+  function addHit(x, y, z, t, sc) {
+    if (G.nh >= MAXH) return false;
+    const o = G.nh * 3; G.hPos[o] = x; G.hPos[o + 1] = y; G.hPos[o + 2] = z; G.hT[G.nh] = t; G.hS[G.nh] = sc; G.nh++; return true;
+  }
+  function addDash(a, b, s0, s1, kind) {
+    if (G.nd + 2 > MAXD) return false;
+    const o = G.nd * 3;
+    G.dPos.set(a, o); G.dPos.set(b, o + 3); G.dPath[G.nd] = s0; G.dPath[G.nd + 1] = s1; G.dKind[G.nd] = G.dKind[G.nd + 1] = kind;
+    G.nd += 2; return true;
+  }
+
+  /* ---- kinematics ---- */
+  function boost(p, bx, by, bz) {                 // rest frame → frame where the parent moves with β
+    const b2 = bx * bx + by * by + bz * bz; if (b2 < 1e-16) return p.slice();
+    const g = 1 / Math.sqrt(1 - b2), bp = bx * p[1] + by * p[2] + bz * p[3], g2 = (g - 1) / b2;
+    return [g * (p[0] + bp), p[1] + g2 * bp * bx + g * bx * p[0], p[2] + g2 * bp * by + g * by * p[0], p[3] + g2 * bp * bz + g * bz * p[0]];
+  }
+  const boostBy = (p, par) => boost(p, par[1] / par[0], par[2] / par[0], par[3] / par[0]);
+  const pBreak = (M, m1, m2) => { const a = (M * M - (m1 + m2) ** 2) * (M * M - (m1 - m2) ** 2); return a > 0 ? Math.sqrt(a) / (2 * M) : 0; };
+  function isoDir() { const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = TWO_PI * rnd(); return [st * Math.cos(ph), st * Math.sin(ph), ct]; }
+  function twoBody(M, m1, m2) {                   // in the parent rest frame
+    const q = pBreak(M, m1, m2), d = isoDir();
+    return [[Math.hypot(q, m1), q * d[0], q * d[1], q * d[2]], [Math.hypot(q, m2), -q * d[0], -q * d[1], -q * d[2]]];
+  }
+  function threeBody(M, m1, m2, m3) {             // flat phase space, sequential M → (12) 3, (12) → 1 2
+    const lo = m1 + m2, hi = M - m3;
+    let wmax = 0; for (let i = 1; i < 40; i++) { const m12 = lo + (hi - lo) * i / 40; wmax = Math.max(wmax, pBreak(M, m12, m3) * pBreak(m12, m1, m2)); }
+    let m12;
+    for (let it = 0; it < 1000; it++) { m12 = lo + (hi - lo) * rnd(); if (rnd() * wmax * 1.05 < pBreak(M, m12, m3) * pBreak(m12, m1, m2)) break; }
+    const [p12, p3] = twoBody(M, m12, m3);
+    const [a, b] = twoBody(m12, m1, m2);
+    return [boostBy(a, p12), boostBy(b, p12), p3];
+  }
+  function decay(par4, M, names) {                // lab-frame daughters
+    const ms = names.map(n => P[n].m);
+    const rest = names.length === 2 ? twoBody(M, ms[0], ms[1]) : threeBody(M, ms[0], ms[1], ms[2]);
+    return rest.map((p, i) => ({ k: names[i], p: boostBy(p, par4) }));
+  }
+  function fourMom(m, pt, y, phi) { const mT = Math.hypot(m, pt); return [mT * Math.cosh(y), pt * Math.cos(phi), pt * Math.sin(phi), mT * Math.sinh(y)]; }
+
+  /* ---- transport: helix in By, energy loss + multiple scattering (μ), hadronic absorption, π/K → μν ---- */
+  function newTrack(k, cat, ue, pt) {
+    const sp = P[k];
+    return { k, sp: sp.sp, q: sp.q, cat, ue, pt, start: G.nv, count: 0, h0: G.nh, nh: 0, vt: 0, ms: 0, last: -1, end: 0, endP: 0, stop: '' };
+  }
+  function trace(k, p4, x0, s0, cat, ue, out) {
+    const sp = P[k];
+    let pp = Math.hypot(p4[1], p4[2], p4[3]);
+    if (pp < 1e-4) return;
+    const tr = newTrack(k, cat, ue, Math.hypot(p4[1], p4[2]));
+    let d = [p4[1] / pp, p4[2] / pp, p4[3] / pp], x = x0.slice(), s = s0;
+    const isMu = sp.sp === 'mu';
+    // decay in flight (π, K) and hadronic interaction point inside the absorber
+    let sDec = Infinity, sInt = Infinity, lamLeft = isMu ? Infinity : -Math.log(rnd() + 1e-12);
+    if (sp.ctau && !isMu) sDec = s0 + pp / sp.m * sp.ctau * -Math.log(rnd() + 1e-12);
+    let seg = 0;
+    while (seg < 900) {
+      const z = x[2], mat = material(x[0], x[1], z), B = By(x[0], x[1], z);
+      const k3 = B !== 0 ? 0.3 * sp.q * B / pp : 0;
+      let ds = z < ABS_Z0 ? 0.008 : mat ? 0.05 : 0.10;
+      if (k3) ds = Math.min(ds, 0.08 / Math.abs(k3));
+      if (z < ABS_Z0 && d[2] > 0.05) ds = Math.min(ds, (ABS_Z0 - z) / d[2] + 1e-4);
+      if (s + ds > sDec) ds = Math.max(sDec - s, 1e-5);
+      // bend (B ∥ y): dd/ds = k (−d_z, 0, d_x)
+      if (k3) { d = [d[0] - k3 * d[2] * ds, d[1], d[2] + k3 * d[0] * ds]; const n = Math.hypot(...d); d = d.map(v => v / n); }
+      if (mat && isMu) {
+        pp -= mat.dEdx * ds;
+        if (pp < 0.12) { tr.stop = 'ranged out'; break; }
+        const th0 = 0.0136 / pp * Math.sqrt(ds / mat.X0);
+        const a = Math.abs(d[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+        let u = [a[1] * d[2] - a[2] * d[1], a[2] * d[0] - a[0] * d[2], a[0] * d[1] - a[1] * d[0]]; const un = Math.hypot(...u); u = u.map(v => v / un);
+        const w = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
+        const g1 = th0 * gauss(), g2 = th0 * gauss();
+        d = [d[0] + g1 * u[0] + g2 * w[0], d[1] + g1 * u[1] + g2 * w[1], d[2] + g1 * u[2] + g2 * w[2]];
+        const n = Math.hypot(...d); d = d.map(v => v / n);
+      }
+      if (mat && !isMu) {
+        lamLeft -= ds / mat.lam;
+        if (lamLeft < 0) { sInt = s; tr.stop = 'absorbed'; }
+      }
+      const nx = [x[0] + d[0] * ds, x[1] + d[1] * ds, x[2] + d[2] * ds], ns = s + ds;
+      if (sInt < Infinity) break;
+      if (!addSeg(x, s, nx, ns)) break;
+      seg++;
+      // hits: VT planes and MS stations
+      for (const pz of VT_Z) if ((x[2] < pz) !== (nx[2] < pz)) {
+        const f = (pz - x[2]) / (nx[2] - x[2]), hx = x[0] + f * (nx[0] - x[0]), hy = x[1] + f * (nx[1] - x[1]);
+        if (Math.abs(hx) < VT_H && Math.abs(hy) < VT_H && Math.hypot(hx, hy) > VT_HOLE && addHit(hx, hy, pz, s + f * ds, 0.0011)) { tr.nh++; tr.vt++; }
+      }
+      for (let i = 0; i < MS_Z.length; i++) { const pz = MS_Z[i]; if ((x[2] < pz) !== (nx[2] < pz)) {
+        const f = (pz - x[2]) / (nx[2] - x[2]), hx = x[0] + f * (nx[0] - x[0]), hy = x[1] + f * (nx[1] - x[1]);
+        if (Math.abs(hx) < msHx(pz) && Math.abs(hy) < msHy(pz) && Math.max(Math.abs(hx), Math.abs(hy)) > msHole(pz) && addHit(hx, hy, pz, s + f * ds, 0.022)) { tr.nh++; tr.ms++; tr.last = i; }
+      } }
+      x = nx; s = ns;
+      if (s >= sDec - 1e-6) {                      // π/K → μ ν (K: 63.6 %)
+        tr.stop = 'decayed';
+        tr.count = G.nv - tr.start; tr.end = s; out.push(tr);
+        if (sp.sp === 'pi' || rnd() < 0.636) {
+          const par4 = [Math.hypot(pp, sp.m), pp * d[0], pp * d[1], pp * d[2]];
+          const mu = sp.q > 0 ? 'mu+' : 'mu-';
+          const [dm] = decay(par4, sp.m, [mu, sp.q > 0 ? 'nu' : 'nubar']);
+          trace(mu, dm.p, x, s, 4, ue, out);
+        }
+        G.maxPath = Math.max(G.maxPath, s);
+        return;
+      }
+      if (x[2] > Z_END) { tr.stop = 'end'; break; }
+      if (outside(x[0], x[1], x[2])) { tr.stop = 'left acceptance'; break; }
+      if (Math.abs(Math.atan2(d[0], d[2])) > 2.4 && x[2] < 0) { tr.stop = 'backward'; break; }
+    }
+    tr.count = G.nv - tr.start; tr.end = s; tr.endP = pp;
+    out.push(tr);
+    if (!ue || isMu) G.maxPath = Math.max(G.maxPath, s);
+    return tr;
+  }
+  function neutralLine(p4, x0, s0, kind, zEnd) {
+    const pp = Math.hypot(p4[1], p4[2], p4[3]); if (pp < 1e-6 || p4[3] <= 0) return;
+    const d = [p4[1] / pp, p4[2] / pp, p4[3] / pp], t = (zEnd - x0[2]) / d[2];
+    addDash(x0, [x0[0] + t * d[0], x0[1] + t * d[1], zEnd], s0, s0 + t, kind);
+  }
+
+  /* ---- Glauber (fixed target: projectile → +z onto a target at rest) ---- */
+  function nucleus(A) {
+    if (A === 1) return [[0, 0, 0]];
+    const pts = [];
+    if (A < 20) {                                  // light nucleus: Gaussian, rms ≈ 2.5 fm (⁹Be)
+      const s = 2.5 / Math.sqrt(3);
+      for (let i = 0; i < A; i++) pts.push([s * gauss(), s * gauss(), s * gauss()]);
+    } else {
+      const R = 6.62, a = 0.546;
+      while (pts.length < A) {
+        const r = rnd() * 11;
+        if (rnd() * 30 > r * r / (1 + Math.exp((r - R) / a))) continue;
+        const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = TWO_PI * rnd(), p = [r * st * Math.cos(ph), r * st * Math.sin(ph), r * ct];
+        let ok = true;
+        for (const q of pts) { const dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2]; if (dx * dx + dy * dy + dz * dz < 0.16) { ok = false; break; } }
+        if (ok) pts.push(p);
+      }
+    }
+    let c = [0, 0, 0]; for (const p of pts) for (let j = 0; j < 3; j++) c[j] += p[j] / A;
+    for (const p of pts) for (let j = 0; j < 3; j++) p[j] -= c[j];
+    return pts;
+  }
+  const kin = (sysKey, pBeam) => {
+    const Eb = Math.hypot(pBeam, MN), sNN = 2 * MN * MN + 2 * MN * Eb, yb = Math.asinh(pBeam / MN);
+    return { sNN, rs: Math.sqrt(sNN), yBeam: yb, yCM: yb / 2, gamma: Eb / MN };
+  };
+  const sigNN = s => 30 + 1.3 * Math.log(Math.max(s, 40) / 40);                 // σ_inel^NN (mb), ≈ 32.6 mb at √s = 17.3 GeV
+  const sigCC = rs => rs <= 3.8 ? 0 : 4.5 * Math.pow((1 - 3.74 / rs) / (1 - 3.74 / 17.27), 4);   // σ_cc̄^NN (µb), rough
+  function glauber(S, rs, centPct) {
+    const s = rs * rs, d2 = 0.1 * sigNN(s) / Math.PI;
+    for (let tries = 0; tries < 400; tries++) {
+      const A = nucleus(S.Ap), B = nucleus(S.At);
+      let b, c = null;
+      if (S.Ap > 1) { c = Math.min(Math.max(centPct + 2.5 + (rnd() - 0.5) * 5, 0.3), 92) / 100; b = Math.sqrt(c * 700 / Math.PI); }
+      else { const Rm = S.At > 20 ? 9.5 : 4.5; b = Rm * Math.sqrt(rnd()); }
+      for (const p of A) p[0] += b / 2;
+      for (const p of B) p[0] -= b / 2;
+      const pa = new Uint8Array(A.length), pb = new Uint8Array(B.length);
+      let ncoll = 0;
+      for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
+        const dx = A[i][0] - B[j][0], dy = A[i][1] - B[j][1];
+        if (dx * dx + dy * dy < d2) { ncoll++; pa[i] = 1; pb[j] = 1; }
+      }
+      const npP = pa.reduce((a, v) => a + v, 0), npT = pb.reduce((a, v) => a + v, 0);
+      if (ncoll < 1 || npP + npT < 2) continue;
+      const rot = rnd() * TWO_PI, cr = Math.cos(rot), sr = Math.sin(rot);
+      for (const p of [...A, ...B]) { const x = p[0], y = p[1]; p[0] = cr * x - sr * y; p[1] = sr * x + cr * y; }
+      const nucleons = [];
+      A.forEach((p, i) => nucleons.push({ p, side: 1, part: pa[i] }));
+      B.forEach((p, i) => nucleons.push({ p, side: -1, part: pb[i] }));
+      const parts = nucleons.filter(n => n.part), np = parts.length;
+      let mx = 0, my = 0; for (const n of parts) { mx += n.p[0] / np; my += n.p[1] / np; }
+      let r2 = 0, c2 = 0, s2 = 0;
+      for (const n of parts) { const x = n.p[0] - mx, y = n.p[1] - my, rr = x * x + y * y, ph = Math.atan2(y, x); r2 += rr; c2 += rr * Math.cos(2 * ph); s2 += rr * Math.sin(2 * ph); }
+      const eps2 = np > 2 && r2 > 0 ? Math.hypot(c2, s2) / r2 : 0, psi2 = (Math.atan2(s2, c2) + Math.PI) / 2;
+      let su = 0, sv = 0; const cu = Math.cos(psi2), snu = Math.sin(psi2);
+      for (const n of parts) { const x = n.p[0] - mx, y = n.p[1] - my; su += (x * cu + y * snu) ** 2 / np; sv += (-x * snu + y * cu) ** 2 / np; }
+      if (c === null) c = NaN;
+      return { b, c: c * 100, ncoll, npart: np, npP, npT, nucleons, eps2, psi2, mx, my, su: Math.sqrt(su), sv: Math.sqrt(sv) };
+    }
+    return null;
+  }
+
+  /* ---- underlying event (toy, not a transport model) ---- */
+  const UE_SP = [ // name, fraction of charged, inverse slope (GeV) of a Γ-shaped pT spectrum
+    { keys: ['pi+', 'pi-'], qp: 0.5, frac: 0.79, th: 0.17 },
+    { keys: ['K+', 'K-'], qp: 0.62, frac: 0.09, th: 0.22 },
+    { keys: ['p', 'pbar'], qp: 0.97, frac: 0.12, th: 0.28 },
+  ];
+  function underlying(gl, K, PV, out) {
+    const s = K.sNN, perPair = 0.78 * Math.pow(s, 0.155) * 0.5;               // dN_ch/dη per participant pair ∝ s^0.155
+    const dndy = perPair * gl.npart;
+    const sy = Math.sqrt(Math.log(K.rs / (2 * MN)));                          // Landau rapidity width
+    const yc = K.yCM + 0.5 * Math.log(gl.npP / gl.npT);
+    const ntot = Math.min(Math.round(dndy * Math.sqrt(TWO_PI) * sy * (1 + 0.05 * gauss())), MAXTRK - 200);
+    const v2 = Math.min((0.10 + 0.012 * Math.log(s)) * gl.eps2, 0.12);
+    for (let i = 0; i < ntot; i++) {
+      let u = rnd(), t = UE_SP[0]; for (const c of UE_SP) { if ((u -= c.frac) < 0) { t = c; break; } }
+      const k = rnd() < t.qp ? t.keys[0] : t.keys[1];
+      const pt = Math.min(Math.max(-t.th * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)), 0.03), 4);
+      const y = k === 'p' ? yc + (rnd() < 0.5 ? -1 : 1) * 0.55 * sy + 0.6 * sy * gauss() : yc + sy * gauss();
+      const v2pt = Math.min(v2 * Math.min(pt / 0.8, 2), 0.2);
+      let phi; do { phi = rnd() * TWO_PI; } while (rnd() * (1 + 2 * v2pt) > 1 + 2 * v2pt * Math.cos(2 * (phi - gl.psi2)));
+      trace(k, fourMom(P[k].m, pt, y, phi), PV, 0, 0, true, out);
+    }
+    return { ntot, dndy, sy, yc, v2 };
+  }
+
+  /* ---- heavy-flavour signal ---- */
+  function pickHF() { let u = rnd(); for (const h of HF) if ((u -= h.frac) < 0) return h; return HF[0]; }
+  function charmHadron(H, anti, mode, K, sD, phi, PV, out, info) {
+    const T = 0.27, mT = H.m + -T * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)), pt = Math.sqrt(mT * mT - H.m * H.m);
+    const y = K.yc + sD * gauss();
+    const p4 = fourMom(H.m, pt, y, phi), pp = Math.hypot(p4[1], p4[2], p4[3]);
+    const L = pp / H.m * H.ctau * -Math.log(rnd() + 1e-12);
+    const d = [p4[1] / pp, p4[2] / pp, p4[3] / pp], SV = [PV[0] + L * d[0], PV[1] + L * d[1], PV[2] + L * d[2]];
+    // flight line (drawn as a track, category 5)
+    const fl = { k: 'D', sp: 'D', q: anti ? -H.q : H.q, cat: 5, ue: false, pt, start: G.nv, count: 0, h0: G.nh, nh: 0, vt: 0, ms: 0, end: L, stop: 'decayed' };
+    addSeg(PV, 0, SV, L); fl.count = G.nv - fl.start; out.push(fl);
+    let names, semi;
+    if (mode === 'mu') { names = H.mu; semi = true; }
+    else if (mode === 'kpi') { names = ['K-', 'pi+']; semi = false; }
+    else if (rnd() < H.semi) { names = H.mu; semi = true; }
+    else { let u = rnd(); names = H.had[H.had.length - 1][0]; for (const [n, f] of H.had) if ((u -= f) < 0) { names = n; break; } semi = false; }
+    if (anti) names = names.map(n => CONJ[n]);
+    const dau = decay(p4, H.m, names), rec = { H, anti, p4, L, SV, semi, names, mu: null, y, pt, pp };
+    for (const dd of dau) {
+      if (dd.k === 'phi') { for (const kk of decay(dd.p, P.phi.m, ['K+', 'K-'])) trace(kk.k, kk.p, SV, L, 1, false, out); continue; }
+      const sp = P[dd.k];
+      if (sp.q === 0) { if (dd.k === 'nu' || dd.k === 'nubar') neutralLine(dd.p, SV, L, 2, 1.6); else if (dd.k !== 'pi0') neutralLine(dd.p, SV, L, 1, ABS_Z0); continue; }
+      const isMu = sp.sp === 'mu';
+      const tr = trace(dd.k, dd.p, SV, L, isMu ? 2 : 1, false, out);
+      if (isMu) {
+        rec.mu = { tr, p4: dd.p };
+        const pm = Math.hypot(dd.p[1], dd.p[2], dd.p[3]), u = [dd.p[1] / pm, dd.p[2] / pm, dd.p[3] / pm];
+        const w = [SV[0] - PV[0], SV[1] - PV[1], SV[2] - PV[2]];
+        rec.mu.dca = Math.hypot(w[1] * u[2] - w[2] * u[1], w[2] * u[0] - w[0] * u[2], w[0] * u[1] - w[1] * u[0]);   // true 3D DCA to the primary vertex
+      }
+      if (mode === 'kpi') (rec.kpi = rec.kpi || []).push(tr);
+    }
+    info.push(rec);
+    return rec;
+  }
+  const trig = tr => tr && tr.ms >= 5 && tr.last >= 4;    // μ crossed the wall: hits on ≥ 5 stations incl. MS4/MS5
+  const invM = (a, b) => { const E = a[0] + b[0], x = a[1] + b[1], y = a[2] + b[2], z = a[3] + b[3]; return Math.sqrt(Math.max(E * E - x * x - y * y - z * z, 0)); };
+
+  function signal(kind, K, PV, out) {
+    const sD = Math.max(0.35, 0.45 * K.sy);
+    const save = () => ({ nv: G.nv, nh: G.nh, nd: G.nd, n: out.length, mp: G.maxPath });
+    const back = st => { G.nv = st.nv; G.nh = st.nh; G.nd = st.nd; out.length = st.n; G.maxPath = st.mp; };
+    if (kind === 'mb') {
+      const info = [], n = poisson(K.nccExp);
+      for (let i = 0; i < n; i++) { const phi = TWO_PI * rnd(); charmHadron(pickHF(), false, 'gen', K, sD, phi, PV, out, info); charmHadron(pickHF(), true, 'gen', K, sD, phi + Math.PI + 1.0 * gauss(), PV, out, info); }
+      return { kind, info, tries: 1, forced: false };
+    }
+    const st = save();
+    for (let tries = 1; tries <= 600; tries++) {
+      back(st);
+      const info = [];
+      if (kind === 'jpsi') {
+        const mT = JPSI.m + -0.25 * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)), pt = Math.sqrt(mT * mT - JPSI.m * JPSI.m);
+        const p4 = fourMom(JPSI.m, pt, K.yc + 0.4 * K.sy * gauss(), TWO_PI * rnd());
+        const dau = decay(p4, JPSI.m, ['mu+', 'mu-']);
+        const t1 = trace('mu+', dau[0].p, PV, 0, 3, false, out), t2 = trace('mu-', dau[1].p, PV, 0, 3, false, out);
+        const ok = trig(t1) && trig(t2);
+        if (ok || tries === 600) return { kind, info, tries, forced: true, ok, jpsi: { p4, pt, y: 0.5 * Math.log((p4[0] + p4[3]) / (p4[0] - p4[3])), mus: [{ tr: t1, p4: dau[0].p }, { tr: t2, p4: dau[1].p }] } };
+        continue;
+      }
+      const phi = TWO_PI * rnd(), phi2 = phi + Math.PI + 1.0 * gauss();
+      if (kind === 'cmumu') {
+        const a = charmHadron(pickHF(), false, 'mu', K, sD, phi, PV, out, info), b = charmHadron(pickHF(), true, 'mu', K, sD, phi2, PV, out, info);
+        const n = (trig(a.mu.tr) ? 1 : 0) + (trig(b.mu.tr) ? 1 : 0);
+        if (n === 2 || (tries > 400 && n === 1) || tries === 600) return { kind, info, tries, forced: true, ok: n === 2, nTrig: n };
+      } else if (kind === 'dkpi') {
+        const a = charmHadron(HF[0], false, 'kpi', K, sD, phi, PV, out, info);
+        charmHadron(pickHF(), true, 'gen', K, sD, phi2, PV, out, info);
+        const ok = a.kpi && a.kpi.every(t => t && t.vt >= 4);
+        if (ok || tries === 600) return { kind, info, tries, forced: true, ok };
+      }
+    }
+  }
+
+  /* ---- one event ---- */
+  function generate(cfg) {
+    const S = SYSTEMS[cfg.sys];
+    G.nv = G.nh = G.nd = 0; G.maxPath = 0;
+    const K = kin(cfg.sys, cfg.pBeam);
+    const gl = glauber(S, K.rs, cfg.cent);
+    K.yc = K.yCM + 0.5 * Math.log(gl.npP / gl.npT);
+    K.sy = Math.sqrt(Math.log(K.rs / (2 * MN)));
+    K.sigCC = sigCC(K.rs); K.sigNN = sigNN(K.sNN);
+    K.nccExp = K.sigCC * 1e-3 / K.sigNN * gl.ncoll;
+    const it = Math.floor(rnd() * TGT_Z.length);
+    const PV = [3e-5 * gauss(), 3e-5 * gauss(), TGT_Z[it] + 0.0015 * (rnd() - 0.5)];
+    const out = [];
+    const sig = signal(cfg.signal, K, PV, out);
+    const nSig = out.length;
+    const ue = underlying(gl, K, PV, out);
+    // summary
+    const trks = out;
+    const muons = trks.filter(t => t.sp === 'mu');
+    const trigMu = muons.filter(trig);
+    const sigMu = sig.kind === 'jpsi' ? sig.jpsi.mus : sig.info.filter(r => r.mu).map(r => r.mu);
+    let mmm = null;
+    if (sigMu.length >= 2) { const m = invM(sigMu[0].p4, sigMu[1].p4); mmm = m * (1 + 0.0107 * gauss()); }    // σ_M/M ≈ 1.1 % (11 MeV at ω, 33 MeV at J/ψ)
+    const ueTr = trks.slice(nSig);
+    return {
+      S, cfg, K, gl, PV, target: it, sig, ue, trks, nSig,
+      nCh: ue.ntot, nVT: ueTr.filter(t => t.vt >= 4).length, nAbs: ueTr.filter(t => t.stop === 'absorbed').length,
+      nMuTrig: trigMu.length, nBkgMu: muons.filter(t => t.cat === 4).length, nBkgTrig: trigMu.filter(t => t.cat === 4).length,
+      mmm, maxPath: Math.min(G.maxPath, 13),
+    };
+  }
+
+  return { generate, G, P, HF, SYSTEMS, TGT_Z, VT_Z, VT_H, VT_HOLE, MEP, ABS, ABS_Z0, ABS_Z1, absH, plugR, MS_Z, msHx, msHy, msHole, MNP, WALL, Z_END, MAXV, MAXH, MAXD, MAXTRK, kin, sigCC, sigNN, By };
+})();
+/* ==== PHYSICS END ==== */
+
+const { G, VT_Z, VT_H, VT_HOLE, MEP, ABS, ABS_Z0, ABS_Z1, absH, plugR, MS_Z, msHx, msHy, msHole, MNP, WALL, TGT_Z, MAXV, MAXH, MAXD, SYSTEMS } = PHYS;
+
+/* ---------------- display constants ---------------- */
+const GAMMA_VIS = 12;     // max drawn Lorentz contraction of the projectile
+const V_NUC = 1.6;        // display m/s of the incoming beam nucleus
+const T0 = 0.55;          // display s when tracks start
+// TRACK REVEAL: path length (m) revealed vs display time: slow through the first 1.5 cm (secondary vertex), then the VT, then fast to the muon wall.
+const REV = [[1.5, 0.01], [2.4, 0.2], [1e9, 3.0]];   // [duration (display s), speed (m/s)]
+function reveal(tau) {
+  if (tau < 0) return tau * 0.01;
+  let s = 0;
+  for (const [dt, v] of REV) { if (tau <= dt) return s + v * tau; s += v * dt; tau -= dt; }
+  return s;
+}
+function revealTime(path) {
+  let t = 0, s = 0;
+  for (const [dt, v] of REV) { if (path <= s + v * dt) return t + (path - s) / v; s += v * dt; t += dt; }
+  return t;
+}
+const D2R = Math.PI / 180;
+let S = 1e-15;            // metres per fm on screen (nuclei zoom)
+const S0 = 0.25 / 6.62;   // display scale at full zoom: R_Pb → 25 cm
+
+/* ---------------- renderer ---------------- */
+let renderer;
+try {
+  renderer = new THREE.WebGPURenderer({ antialias: true });
+  await renderer.init();
+} catch (e) { fail('Could not start a WebGPU or WebGL2 renderer in this browser.'); throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x060a13, 1);
+app.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x060a13, 30, 70);   // fog near/far (m)
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.002, 300);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.02; controls.maxDistance = 60;
+controls.autoRotateSpeed = 0.5; controls.autoRotate = true;
+
+scene.add(new THREE.HemisphereLight(0xbfd2ff, 0x1a1408, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, -4); scene.add(sun);
+
+/* ---------------- uniforms ---------------- */
+const uT = uniform(-10);   // revealed path length (m)
+const uDet = uniform(1);
+const uFire = uniform(0);
+const uFlash = uniform(0);
+const uUE = uniform(1);
+
+/* ---------------- detector ---------------- */
+const det = new THREE.Group(); scene.add(det);
+
+function shellMat(hex, rim, base) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
+  m.colorNode = color(hex);
+  m.opacityNode = f.mul(rim).add(base).mul(uDet);
+  return m;
+}
+const lineMat = (hex, op) => new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+function segs(v, mat, parent = det) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
+}
+function rectV(hx, hy, z, v = [], cx = 0, cy = 0) {
+  const c = [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]];
+  for (let i = 0; i < 4; i++) { const a = c[i], b = c[(i + 1) % 4]; v.push(cx + a[0], cy + a[1], z, cx + b[0], cy + b[1], z); }
+  return v;
+}
+function frustumV(h0x, h0y, z0, h1x, h1y, z1, v = []) {
+  rectV(h0x, h0y, z0, v); rectV(h1x, h1y, z1, v);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) v.push(sx * h0x, sy * h0y, z0, sx * h1x, sy * h1y, z1);
+  return v;
+}
+function frustumMesh(h0x, h0y, z0, h1x, h1y, z1, mat) {
+  const C = (hx, hy, z) => [[-hx, -hy, z], [hx, -hy, z], [hx, hy, z], [-hx, hy, z]];
+  const a = C(h0x, h0y, z0), b = C(h1x, h1y, z1), pos = [];
+  const quad = (p, q, r, s) => pos.push(...p, ...q, ...r, ...p, ...r, ...s);
+  for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(a[i], a[j], b[j], b[i]); }
+  quad(a[0], a[1], a[2], a[3]); quad(b[0], b[1], b[2], b[3]);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, mat); det.add(m); return m;
+}
+// planar detector with a procedural cell grid (TSL, fwidth-antialiased); uvT in cell units
+function gridMat(hex, base, fine, coarse) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const uvT = attribute('uvT', 'vec2');
+  const gridLine = (q, wmul) => {
+    const f = fract(q), w = fwidth(q).mul(wmul);
+    const d = min(f, float(1).sub(f));
+    const l = float(1).sub(smoothstep(float(0), w, d));
+    return max(l.x, l.y);
+  };
+  const fw = fwidth(uvT);
+  const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
+  m.colorNode = color(hex);
+  m.opacityNode = float(base).add(gridLine(uvT, 1.0).mul(fade).mul(fine)).add(gridLine(uvT.mul(1 / 4), 1.2).mul(coarse)).mul(uDet);
+  return m;
+}
+function plane(hx, hy, z, cellX, cellY, mat) {
+  const g = new THREE.PlaneGeometry(2 * hx, 2 * hy, 1, 1);
+  const p = g.attributes.position, uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) { uv[2 * i] = (p.getX(i) + hx) / cellX; uv[2 * i + 1] = (p.getY(i) + hy) / cellY; }
+  g.setAttribute('uvT', new THREE.BufferAttribute(uv, 2));
+  g.translate(0, 0, z);
+  const m = new THREE.Mesh(g, mat); det.add(m); return m;
+}
+
+// targets: 5 Pb disks (first Ø 6 mm, others Ø 1 mm, 1.5 mm thick)
+const tgtMat = new THREE.MeshStandardNodeMaterial({ color: 0x9aa6bb, roughness: 0.35, metalness: 0.7 });
+const tgtMeshes = TGT_Z.map((z, i) => {
+  const r = i === 0 ? 0.003 : 0.0005, g = new THREE.CylinderGeometry(r, r, 0.0015, 32);
+  g.rotateX(Math.PI / 2); const m = new THREE.Mesh(g, tgtMat); m.position.z = z; det.add(m); return m;
+});
+// VT: 5 MAPS planes 30×30 cm (4 sensors of 15×15 cm), 6 mm hole; fine grid = 2.17 cm RSU-like tiles
+{
+  const vtMat = gridMat('#5fd3c6', 0.03, 0.10, 0.35), v = [];
+  for (const z of VT_Z) {
+    plane(VT_H, VT_H, z, 0.15 / 4 * 0.58, 0.15 / 4 * 0.58, vtMat);
+    rectV(VT_H, VT_H, z, v); rectV(VT_HOLE, VT_HOLE, z, v);
+    v.push(-VT_H, 0, z, -VT_HOLE, 0, z, VT_HOLE, 0, z, VT_H, 0, z, 0, -VT_H, z, 0, -VT_HOLE, z, 0, VT_HOLE, z, 0, VT_H, z);
+  }
+  segs(v, lineMat(0x5fd3c6, 0.55));
+}
+// MEP48 dipole: round poles Ø 1 m above/below the 40 cm gap, return yoke outline
+{
+  const poleMat = shellMat('#c44a3a', 0.30, 0.018);
+  for (const s of [1, -1]) {
+    const g = new THREE.CylinderGeometry(MEP.R, MEP.R, 0.25, 64, 1, false);
+    const m = new THREE.Mesh(g, poleMat); m.position.set(0, s * (MEP.gapH + 0.125), MEP.zc); det.add(m);
+  }
+  const v = [];
+  for (const y of [MEP.gapH, MEP.gapH + 0.25, -MEP.gapH, -MEP.gapH - 0.25]) for (let i = 0; i < 64; i++) {
+    const a0 = i / 64 * Math.PI * 2, a1 = (i + 1) / 64 * Math.PI * 2;
+    v.push(MEP.R * Math.cos(a0), y, MEP.zc + MEP.R * Math.sin(a0), MEP.R * Math.cos(a1), y, MEP.zc + MEP.R * Math.sin(a1));
+  }
+  // C-shaped yoke (schematic)
+  const X = 1.05, Y = 0.95, z0 = MEP.zc - 0.55, z1 = MEP.zc + 0.55;
+  for (const z of [z0, z1]) v.push(-X, -Y, z, X, -Y, z, X, -Y, z, X, Y, z, X, Y, z, -X, Y, z, -X, Y, z, -X, -Y, z, -0.6, -Y, z, -0.6, Y, z);
+  for (const [x, y] of [[-X, -Y], [X, -Y], [X, Y], [-X, Y]]) v.push(x, y, z0, x, y, z1);
+  segs(v, lineMat(0xc44a3a, 0.22));
+}
+// hadron absorber: BeO → Al₂O₃ → graphite, tungsten plug on axis
+const ABS_HEX = { 'BeO': '#c79bff', 'Al₂O₃': '#9fb7e0', 'C': '#7d8db0' };
+for (const a of ABS) {
+  frustumMesh(absH(a.z0), absH(a.z0), a.z0, absH(a.z1), absH(a.z1), a.z1, shellMat(ABS_HEX[a.name], 0.16, a.name === 'C' ? 0.010 : 0.022));
+  segs(frustumV(absH(a.z0), absH(a.z0), a.z0, absH(a.z1), absH(a.z1), a.z1), lineMat(new THREE.Color(ABS_HEX[a.name]).getHex(), 0.38));
+}
+{
+  const g = new THREE.CylinderGeometry(plugR(ABS_Z1), plugR(ABS_Z0), ABS_Z1 - ABS_Z0, 32, 1, true);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, (ABS_Z0 + ABS_Z1) / 2);
+  det.add(new THREE.Mesh(g, shellMat('#8fa3c8', 0.30, 0.03)));   // W plug: grey-blue, kept apart from the muon colours
+}
+// muon spectrometer: 6 MWPC stations (slats ≈ 55 × 70 cm), MNP33 dipole, graphite muon wall
+{
+  const msMat = gridMat('#6f8db8', 0.012, 0.06, 0.10), v = [];
+  for (const z of MS_Z) {
+    plane(msHx(z), msHy(z), z, 0.55, 0.70, msMat);
+    rectV(msHx(z), msHy(z), z, v); rectV(msHole(z), msHole(z), z, v);
+  }
+  segs(v, lineMat(0x8fa9d4, 0.45));
+  // MNP33: aperture box + window-frame yoke
+  const y = [];
+  frustumV(MNP.hx, MNP.hy, MNP.z0, MNP.hx, MNP.hy, MNP.z1, y);
+  frustumV(MNP.hx + 0.9, MNP.hy + 1.0, MNP.z0 + 0.25, MNP.hx + 0.9, MNP.hy + 1.0, MNP.z1 - 0.25, y);
+  segs(y, lineMat(0xc44a3a, 0.26));
+  for (const s of [1, -1]) {     // coils above/below the gap
+    const g = new THREE.BoxGeometry(2 * MNP.hx + 0.3, 0.35, MNP.z1 - MNP.z0 + 0.4);
+    const m = new THREE.Mesh(g, shellMat('#c44a3a', 0.22, 0.012)); m.position.set(0, s * (MNP.hy + 0.175), (MNP.z0 + MNP.z1) / 2); det.add(m);
+  }
+  const wh0 = msHx(WALL.z0) + 0.1, wv0 = msHy(WALL.z0) + 0.1, wh1 = msHx(WALL.z1) + 0.1, wv1 = msHy(WALL.z1) + 0.1;
+  frustumMesh(wh0, wv0, WALL.z0, wh1, wv1, WALL.z1, shellMat('#7d8db0', 0.14, 0.008));
+  segs(frustumV(wh0, wv0, WALL.z0, wh1, wv1, WALL.z1), lineMat(0x7d8db0, 0.35));
+}
+// beam line
+segs([0, 0, -30, 0, 0, 13], lineMat(0x8fa3c8, 0.30), scene);
+
+/* ---------------- nuclei (instanced nucleons) ---------------- */
+const NUC = 416;
+const nucMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.4, metalness: 0.15 });
+const nucMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), nucMat, NUC);
+nucMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+for (let i = 0; i < NUC; i++) nucMesh.setColorAt(i, new THREE.Color(0x9fb2cf));
+nucMesh.frustumCulled = false;
+scene.add(nucMesh);
+const glowMat = hex => { const m = new THREE.MeshBasicNodeMaterial(); m.colorNode = color(hex).mul(3); return m; };
+const pMark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMat('#ffb24a')); scene.add(pMark);   // beam bunch marker when the nucleus is sub-pixel
+
+/* ---------------- fireball (TSL noise shader) and vertex flash ---------------- */
+const fireMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const n = mx_noise_float(positionLocal.mul(3.2).add(vec3(0, 0, time.mul(1.4))));
+  const core = abs(dot(normalView, positionViewDirection)).pow(1.6);
+  fireMat.colorNode = mix(color('#ff4a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7);
+  fireMat.opacityNode = uFire.mul(core.mul(0.85).add(0.12)).mul(n.mul(0.45).add(0.8));
+}
+const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 5), fireMat);
+const fireGroup = new THREE.Group(); fireGroup.add(fire); scene.add(fireGroup);
+const flashMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+flashMat.colorNode = color('#fff2cf').mul(2.5); flashMat.opacityNode = uFlash;
+const flash = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), flashMat); scene.add(flash);
+
+/* ---------------- tracks (one LineSegments, revealed by a TSL path-length test) ---------------- */
+const tCol = new Float32Array(MAXV * 3), tUE = new Float32Array(MAXV);
+const trkGeo = new THREE.BufferGeometry();
+const aPos = new THREE.BufferAttribute(G.tPos, 3).setUsage(THREE.DynamicDrawUsage);
+const aPath = new THREE.BufferAttribute(G.tPath, 1).setUsage(THREE.DynamicDrawUsage);
+const aCol = new THREE.BufferAttribute(tCol, 3).setUsage(THREE.DynamicDrawUsage);
+const aUE = new THREE.BufferAttribute(tUE, 1).setUsage(THREE.DynamicDrawUsage);
+trkGeo.setAttribute('position', aPos); trkGeo.setAttribute('pathT', aPath); trkGeo.setAttribute('tcol', aCol); trkGeo.setAttribute('isUE', aUE);
+trkGeo.setDrawRange(0, 0);
+const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const head = exp(uT.sub(pT).max(0).mul(-7)).mul(2.6).add(1);
+  const isUE = attribute('isUE', 'float');
+  const ueOn = float(1).sub(isUE.mul(float(1).sub(uUE)));
+  // bulk hadrons: no leading-edge glow and lower opacity, so ~10³ lines meeting at the vertex do not saturate the bloom
+  trkMat.colorNode = attribute('tcol', 'vec3').mul(mix(head, float(0.55), isUE));
+  trkMat.opacityNode = step(pT, uT).mul(mix(float(0.95), float(0.16), isUE)).mul(ueOn);
+}
+const tracks = new THREE.LineSegments(trkGeo, trkMat); tracks.frustumCulled = false; scene.add(tracks);
+
+/* ---------------- hits (instanced, per-instance time) ---------------- */
+const hitGeo = new THREE.OctahedronGeometry(1, 0);
+const hT = new THREE.InstancedBufferAttribute(G.hT, 1).setUsage(THREE.DynamicDrawUsage);
+const hC = new THREE.InstancedBufferAttribute(new Float32Array(MAXH * 3), 3).setUsage(THREE.DynamicDrawUsage);
+const hU = new THREE.InstancedBufferAttribute(new Float32Array(MAXH), 1).setUsage(THREE.DynamicDrawUsage);
+hitGeo.setAttribute('hitT', hT); hitGeo.setAttribute('hcol', hC); hitGeo.setAttribute('hUE', hU);
+const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const ht = attribute('hitT', 'float');
+  const ueOn = float(1).sub(attribute('hUE', 'float').mul(float(1).sub(uUE)));
+  hitMat.colorNode = attribute('hcol', 'vec3').mul(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2));
+  hitMat.opacityNode = step(ht, uT).mul(ueOn).mul(float(1).sub(attribute('hUE', 'float').mul(0.5)));
+}
+G.hT.fill(1e9);
+const hits = new THREE.InstancedMesh(hitGeo, hitMat, MAXH); hits.frustumCulled = false;   // full count: keeps instance matrices in a vertex buffer (WebGPU 64 kB uniform limit)
+hits.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(hits);
+
+/* ---------------- dashed lines: neutral hadrons (K⁰, Λ), neutrinos ---------------- */
+const DKIND = [
+  { hex: '#fff0b8', f: 12 },   // 0 (unused)
+  { hex: '#b9a6ff', f: 120 },  // 1 neutral hadron from a charm decay
+  { hex: '#5d6c8a', f: 300 },  // 2 neutrino
+].map(k => ({ ...k, c: new THREE.Color(k.hex) }));
+const dCol = new Float32Array(MAXD * 3), dFreq = new Float32Array(MAXD);
+const dGeo = new THREE.BufferGeometry();
+const dAttr = {
+  position: new THREE.BufferAttribute(G.dPos, 3), pathT: new THREE.BufferAttribute(G.dPath, 1),
+  dcol: new THREE.BufferAttribute(dCol, 3), dfreq: new THREE.BufferAttribute(dFreq, 1),
+};
+for (const [k, a] of Object.entries(dAttr)) { a.setUsage(THREE.DynamicDrawUsage); dGeo.setAttribute(k, a); }
+dGeo.setDrawRange(0, 0);
+const dMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const dash = step(fract(pT.mul(attribute('dfreq', 'float'))), float(0.5));
+  dMat.colorNode = attribute('dcol', 'vec3').mul(exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1));
+  dMat.opacityNode = step(pT, uT).mul(dash).mul(0.9);
+}
+const dashes = new THREE.LineSegments(dGeo, dMat); dashes.frustumCulled = false; scene.add(dashes);
+
+/* ---------------- post-processing: bloom ---------------- */
+let post = null;
+try {
+  post = new THREE.PostProcessing(renderer);
+  const sp = pass(scene, camera);
+  const col = sp.getTextureNode('output');
+  post.outputNode = col.add(bloom(col, 0.85, 0.35, 0.12));
+} catch (e) { post = null; }
+
+/* ================= event ================= */
+const PT_STOPS = [0, 0.5, 1, 1.5, 2.5];
+const PT_COLS = ['#3b5bff', '#2fc4e0', '#7be38a', '#ffd166', '#ff5d3a'].map(h => new THREE.Color(h));
+const CH_COLS = { '1': new THREE.Color('#ff7a59'), '-1': new THREE.Color('#4fa3ff'), '0': new THREE.Color('#fff3c4') };
+const SPEC = { pi: { name: 'π±', col: '#7aa2ff' }, K: { name: 'K±', col: '#ffd166' }, p: { name: 'p, p̄', col: '#ff6b8b' }, mu: { name: 'μ±', col: '#43ffb0' }, D: { name: 'charm hadron', col: '#fff3c4' } };
+for (const s of Object.values(SPEC)) s.c = new THREE.Color(s.col);
+const ORIGIN = [
+  { name: 'bulk hadrons', col: '#4c6290' },            // 0 underlying event
+  { name: 'charm-decay hadrons', col: '#5fd3c6' },     // 1
+  { name: 'μ from c → s μ ν', col: '#ffb24a' },        // 2
+  { name: 'μ from J/ψ', col: '#ff5ad1' },              // 3
+  { name: 'μ from π/K decay', col: '#ff5d3a' },        // 4
+  { name: 'D / Λc flight', col: '#fff3c4' },          // 5
+];
+for (const o of ORIGIN) o.c = new THREE.Color(o.col);
+const HIT_DEF = new THREE.Color('#dfe6f3');
+const tmpC = new THREE.Color();
+function trackColor(tr, mode) {
+  if (mode === 'origin') return ORIGIN[tr.cat].c;
+  if (tr.cat === 5) return SPEC.D.c;
+  if (mode === 'charge') return CH_COLS[tr.q];
+  if (mode === 'species') return SPEC[tr.sp].c;
+  const p = Math.min(tr.pt, PT_STOPS[4]);
+  let i = 0; while (i < 3 && p > PT_STOPS[i + 1]) i++;
+  return tmpC.copy(PT_COLS[i]).lerp(PT_COLS[i + 1], (p - PT_STOPS[i]) / (PT_STOPS[i + 1] - PT_STOPS[i]));
+}
+
+let ev = null, evNo = 0, colorMode = 'origin';
+const C_LEAD = new THREE.Color(0x9fb2cf), C_TGT = new THREE.Color(0x8fa3c4), C_PART = new THREE.Color(0xffb24a), C_FLASH = new THREE.Color(4, 2.6, 1.2);
+const SIG_TXT = { cmumu: 'cc̄ → μ⁺μ⁻ X', jpsi: 'J/ψ → μ⁺μ⁻', dkpi: 'D⁰ → K⁻π⁺', mb: 'minimum bias' };
+
+function newEvent() {
+  ev = PHYS.generate({ sys: $('iSys').value, pBeam: +$('iE').value, cent: +$('iCent').value, signal: $('iSig').value });
+  // freeze-out (Cleymans et al. 2006)
+  const muB = 1.308 / (1 + 0.273 * ev.K.rs);
+  ev.muB = muB; ev.Tch = 0.166 - 0.139 * muB * muB - 0.053 * muB ** 4;
+  // first charm hadron, signal muons
+  ev.charm = ev.sig.info[0] || null;
+  ev.sigMu = ev.sig.kind === 'jpsi' ? ev.sig.jpsi.mus : ev.sig.info.filter(r => r.mu).map(r => r.mu);
+  ev.dca = ev.sig.info.filter(r => r.mu).map(r => r.mu.dca);
+  trkGeo.setDrawRange(0, G.nv); aPos.needsUpdate = true; aPath.needsUpdate = true;
+  tUE.fill(0, 0, G.nv);
+  for (const tr of ev.trks) if (tr.ue && tr.cat === 0) tUE.fill(1, tr.start, tr.start + tr.count);
+  aUE.needsUpdate = true;
+  const M = new THREE.Matrix4(), hq = new THREE.Quaternion(), hs = new THREE.Vector3(), hp = new THREE.Vector3();
+  for (let i = 0; i < G.nh; i++) {
+    hp.set(G.hPos[3 * i], G.hPos[3 * i + 1], G.hPos[3 * i + 2]); hs.setScalar(G.hS[i]);
+    hits.setMatrixAt(i, M.compose(hp, hq, hs));
+  }
+  G.hT.fill(1e9, G.nh); hT.needsUpdate = true; hits.instanceMatrix.needsUpdate = true;
+  hU.array.fill(0);
+  for (const tr of ev.trks) if (tr.ue && tr.cat === 0) hU.array.fill(1, tr.h0, tr.h0 + tr.nh);
+  hU.needsUpdate = true;
+  for (let i = 0; i < G.nd; i++) {
+    const k = DKIND[G.dKind[i]];
+    dCol[3 * i] = k.c.r; dCol[3 * i + 1] = k.c.g; dCol[3 * i + 2] = k.c.b; dFreq[i] = k.f;
+  }
+  dGeo.setDrawRange(0, G.nd);
+  for (const a of Object.values(dAttr)) a.needsUpdate = true;
+  tgtMeshes.forEach((m, i) => { m.material = i === ev.target ? tgtHot : tgtMat; });
+  recolor();
+  evNo++;
+  simT = -1.7; lastPhase = -1;
+  uT.value = reveal(simT - T0);   // reset the reveal clock immediately, so the new event never shows the old time
+  stats();
+}
+const tgtHot = new THREE.MeshStandardNodeMaterial({ color: 0xffd9a0, roughness: 0.35, metalness: 0.5, emissive: 0x6a3a10 });
+
+function recolor() {
+  if (!ev) return;
+  for (let i = 0; i < G.nh; i++) { hC.array[3 * i] = HIT_DEF.r; hC.array[3 * i + 1] = HIT_DEF.g; hC.array[3 * i + 2] = HIT_DEF.b; }
+  for (const tr of ev.trks) {
+    const c = trackColor(tr, colorMode), k = tr.cat === 0 && colorMode !== 'origin' ? 0.7 : 1;
+    for (let i = tr.start; i < tr.start + tr.count; i++) { tCol[i * 3] = c.r * k; tCol[i * 3 + 1] = c.g * k; tCol[i * 3 + 2] = c.b * k; }
+    for (let i = tr.h0; i < tr.h0 + tr.nh; i++) { hC.array[i * 3] = c.r; hC.array[i * 3 + 1] = c.g; hC.array[i * 3 + 2] = c.b; }
+  }
+  aCol.needsUpdate = true; hC.needsUpdate = true;
+  legend();
+}
+
+/* ================= animation ================= */
+let simT = -1.7, paused = false, speed = 2, autoLoop = true;
+const dummy = new THREE.Object3D();
+
+function updateNuclei(t) {
+  const rN = 0.85 * S, gv = Math.min(ev.K.gamma, GAMMA_VIS), PVz = ev.PV[2];
+  const nuc = ev.gl.nucleons;
+  for (let i = 0; i < NUC; i++) {
+    if (i >= nuc.length) { dummy.scale.setScalar(0); dummy.updateMatrix(); nucMesh.setMatrixAt(i, dummy.matrix); continue; }
+    const n = nuc[i], proj = n.side === 1;
+    let sc = rN, col = proj ? C_LEAD : C_TGT, zc;
+    if (proj) {                                   // projectile: Lorentz-contracted, moving +z
+      zc = PVz + V_NUC * t + n.p[2] * S / gv;
+      if (n.part) {
+        if (t > 0.12) sc = 0;
+        else if (t >= 0) { col = C_FLASH; sc = rN * 1.3; }
+        else if (t > -0.45) col = tmpC.copy(C_LEAD).lerp(C_PART, Math.min(1, (t + 0.45) / 0.3));
+      } else if (V_NUC * t > ABS_Z0 - PVz) sc = 0;   // spectators continue into the tungsten plug
+      dummy.scale.set(sc, sc, sc / gv * 3 > sc ? sc : sc / gv * 3);
+    } else {                                      // target nucleus: at rest, spherical
+      zc = PVz + n.p[2] * S;
+      if (n.part) {
+        if (t > 0.12) sc = 0;
+        else if (t >= 0) { col = C_FLASH; sc = rN * 1.3; }
+        else if (t > -0.45) col = tmpC.copy(C_TGT).lerp(C_PART, Math.min(1, (t + 0.45) / 0.3));
+      } else if (t > 0.6) sc = rN * Math.max(0, 1 - (t - 0.6) / 1.2);   // target remnant de-excites (drawn fading)
+      dummy.scale.set(sc, sc, sc);
+    }
+    dummy.position.set(n.p[0] * S + ev.PV[0], n.p[1] * S + ev.PV[1], zc);
+    dummy.updateMatrix();
+    nucMesh.setMatrixAt(i, dummy.matrix);
+    nucMesh.setColorAt(i, col);
+  }
+  nucMesh.instanceMatrix.needsUpdate = true;
+  nucMesh.instanceColor.needsUpdate = true;
+  pMark.visible = t < 0 && 7 * S < 0.002;
+  if (pMark.visible) { pMark.position.set(ev.PV[0], ev.PV[1], PVz + V_NUC * t); pMark.scale.setScalar(0.0025); }
+  // vertex flash, visible at any zoom
+  if (t >= 0 && t < 0.45) { uFlash.value = Math.exp(-t * 9) * 0.9; flash.position.set(...ev.PV); flash.scale.setScalar(0.0015 + 0.01 * t); flash.visible = true; }
+  else { flash.visible = false; uFlash.value = 0; }
+}
+
+function updateFire(t) {
+  if (t < 0 || ev.gl.npart < 3) { uFire.value = 0; fireGroup.visible = false; return; }
+  fireGroup.visible = true;
+  const env = THREE.MathUtils.smoothstep(t, 0, 0.06) * (1 - THREE.MathUtils.smoothstep(t, 0.45, 1.05));
+  uFire.value = env;
+  const ve = 0.6, f = S / S0, bcm = Math.tanh(ev.K.yc);       // the fireball moves downstream with y_cm
+  fireGroup.position.set(ev.PV[0] + ev.gl.mx * S, ev.PV[1] + ev.gl.my * S, ev.PV[2] + f * 0.5 * bcm * t);
+  fireGroup.rotation.set(0, 0, ev.gl.psi2);
+  const v2 = Math.min((0.10 + 0.012 * Math.log(ev.K.sNN)) * ev.gl.eps2, 0.12);
+  fire.scale.set(1.6 * ev.gl.su * S + f * ve * (1 + 2 * v2) * t, 1.6 * ev.gl.sv * S + f * ve * (1 - 2 * v2) * t, f * (0.05 + 0.8 * t));
+}
+
+const fmtL = m => m < 1e-3 ? (m * 1e6).toFixed(0) + ' µm' : (m * 1e3).toFixed(2) + ' mm';
+const PHASES = [
+  [() => -0.15, 'Approach', () => {
+    const S_ = ev.S, gv = Math.min(ev.K.gamma, GAMMA_VIS);
+    return `${S_.proj} beam at ${ev.cfg.pBeam} ${S_.unit} (γ ≈ ${ev.K.gamma.toFixed(0)}${S_.Ap > 1 ? `, drawn at γ = ${gv.toFixed(0)}` : ''}) onto a ${S_.targ} target at rest: disk ${ev.target + 1} of 5, z = ${(TGT_Z[ev.target] * 1e3).toFixed(0)} mm. ${7 * S < 0.002 ? 'Nuclei at true size: raise Nuclei zoom to see them.' : 'The target nucleus is at rest, so it is not contracted.'}`;
+  }],
+  [() => 0.08, 'Impact', () => `b = ${ev.gl.b.toFixed(1)} fm · N_part = ${ev.gl.npart} (${ev.gl.npP} projectile + ${ev.gl.npT} target), N_coll = ${ev.gl.ncoll}. Projectile spectators continue into the tungsten beam plug.`],
+  [() => 0.32, 'Hard scattering', () => {
+    const k = ev.sig.kind, nat = `Natural rate here: ⟨N_cc̄⟩ ≈ ${ev.K.nccExp.toPrecision(2)} per event (σ_cc̄ ≈ ${ev.K.sigCC.toFixed(2)} µb per NN collision, toy).`;
+    if (k === 'mb') return `${nat} This minimum-bias event has ${ev.sig.info.length / 2} cc̄ pair(s).`;
+    if (k === 'jpsi') return `A cc̄ pair binds into a J/ψ (forced, ${ev.sig.tries} tries until both μ were in acceptance). At SPS energies charmonium probes the high-μ_B medium. ${nat}`;
+    return `cc̄ pair from a hard NN collision, τ ≈ 1/2m_c ≈ 0.07 fm/c (forced, ${ev.sig.tries} tries). ${nat}`;
+  }],
+  [() => T0 + 0.1, 'Fireball', () => ev.gl.npart > 2 ? `Fireball moving downstream at y_cm = ${ev.K.yc.toFixed(2)}; chemical freeze-out at T_ch ≈ ${(ev.Tch * 1e3).toFixed(0)} MeV, μ_B ≈ ${(ev.muB * 1e3).toFixed(0)} MeV.` : `Few participants: no fireball. y_cm = ${ev.K.yc.toFixed(2)}.`],
+  [() => T0 + revealTime(0.015), 'Secondary vertex', () => {
+    if (ev.sig.kind === 'jpsi') return 'J/ψ decays promptly (cτ ≈ 7 fm), so its muons point back to the primary vertex. Use the Vertex view.';
+    const c = ev.charm; if (!c) return 'No charm in this event: all tracks come from the primary vertex.';
+    const bg = c.pp / c.H.m;
+    return `${c.anti ? c.H.bar : c.H.name} flies L = ${fmtL(c.L)} (cτ = ${(c.H.ctau * 1e6).toFixed(0)} µm, βγ = ${bg.toFixed(1)}) before decaying${c.semi ? ' semi-muonically' : ''}.${ev.dca.length ? ` Muon DCA to the primary vertex: ${ev.dca.map(d => (d * 1e6).toFixed(0)).join(', ')} µm, the handle that separates charm from prompt dimuons.` : ''} Use the Vertex view.`;
+  }],
+  [() => T0 + revealTime(ABS_Z0), 'Vertex telescope', () => `5 MAPS planes at z = 7–38 cm inside MEP48 (1.47 T, B ∥ y): ${ev.nVT.toLocaleString()} bulk tracks with ≥ 4 hits. Impact-parameter resolution ≈ 20 µm at p_T = 1 GeV/c.`],
+  [() => T0 + revealTime(ABS_Z1), 'Hadron absorber', () => `BeO → Al₂O₃ → graphite, z = 0.45–4.0 m: ${ev.nAbs.toLocaleString()} hadrons stop. Muons lose ≈ 1.6 GeV and multiple-scatter, so the VT match fixes their angles. ${ev.nBkg = ev.trks.filter(t => t.cat === 4).length} μ from π/K decays in flight (background).`],
+  [() => 1e9, 'Muon spectrometer', () => {
+    const m = ev.mmm ? ` M_μμ = ${ev.mmm.toFixed(3)} GeV${ev.sig.kind === 'jpsi' ? ' (σ_M ≈ 33 MeV)' : ' (open-charm continuum)'}.` : '';
+    return `MS0–MS3 around MNP33 (0.9 T·m) measure momentum; MS4–MS5 sit behind the graphite wall. ${ev.nMuTrig} triggered μ (${ev.nBkgTrig} from π/K).${m}`;
+  }],
+];
+let lastPhase = -1;
+function phaseUpdate(t) {
+  const i = PHASES.findIndex(p => t < p[0]());
+  if (i !== lastPhase) { lastPhase = i; $('phaseName').textContent = PHASES[i][1]; $('phaseNote').textContent = PHASES[i][2](); }
+}
+
+function stats() {
+  const S_ = ev.S;
+  $('beamLine').textContent = `${S_.proj} ${ev.cfg.pBeam} ${S_.unit} on ${S_.targ} (fixed target) · y_cm = ${ev.K.yc.toFixed(2)} · MEP48 1.47 T · MNP33 0.9 T·m · signal: ${SIG_TXT[ev.sig.kind]}`;
+  $('sEv').textContent = '#' + String(evNo).padStart(3, '0');
+  $('sS').textContent = ev.K.rs.toFixed(1);
+  $('sCent').textContent = S_.Ap > 1 ? ev.gl.c.toFixed(1) + '%' : 'MB';
+  $('sB').textContent = ev.gl.b.toFixed(2);
+  $('sNp').textContent = ev.gl.npart;
+  $('sNc').textContent = ev.gl.ncoll.toLocaleString();
+  $('sNch').textContent = ev.nCh.toLocaleString();
+  $('sVT').textContent = ev.nVT.toLocaleString();
+  $('sNcc').textContent = ev.K.nccExp < 0.01 ? ev.K.nccExp.toExponential(1) : ev.K.nccExp.toFixed(3);
+  $('sL').textContent = ev.charm ? (ev.charm.L * 1e3).toFixed(2) : '—';
+  $('sDca').textContent = ev.dca.length ? ev.dca.map(d => (d * 1e6).toFixed(0)).join(' / ') : '—';
+  $('sMu').textContent = ev.nMuTrig;
+  $('sBkg').textContent = ev.nBkgMu;
+  $('sM').textContent = ev.mmm ? ev.mmm.toFixed(3) : '—';
+  $('sTry').textContent = ev.sig.forced ? ev.sig.tries : '—';
+}
+
+function replay() { simT = -1.7; lastPhase = -1; uT.value = reveal(simT - T0); }
+
+/* ---------------- legend ---------------- */
+const hexOf = c => '#' + c.getHexString(THREE.SRGBColorSpace);
+function legend() {
+  const el = $('legend');
+  if (colorMode === 'origin') {
+    el.innerHTML = `<h2>Track origin (MC truth)</h2><div class="keys col">${ORIGIN.map(o => `<span class="key"><i style="background:${o.col}"></i>${o.name}</span>`).join('')}</div>`;
+  } else if (colorMode === 'pt') {
+    el.innerHTML = `<h2>Track p<sub>T</sub> (GeV/c)</h2>
+      <div class="ramp" style="background:linear-gradient(90deg,${PT_COLS.map(hexOf).join(',')})"></div>
+      <div class="ticks">${PT_STOPS.map((p, i) => `<span style="left:${p / PT_STOPS[4] * 100}%">${i === 4 ? '≥' + p : p}</span>`).join('')}</div>`;
+  } else if (colorMode === 'charge') {
+    el.innerHTML = `<h2>Track charge</h2><div class="keys">
+      <span class="key"><i style="background:#ff7a59"></i>positive</span>
+      <span class="key"><i style="background:#4fa3ff"></i>negative</span></div>`;
+  } else {
+    el.innerHTML = `<h2>Species (MC truth)</h2><div class="keys">${Object.values(SPEC).map(s => `<span class="key"><i style="background:${s.col}"></i>${s.name}</span>`).join('')}</div>`;
+  }
+  const dash = (hex, st) => `background:repeating-linear-gradient(90deg,${hex} 0 ${st}px,transparent ${st}px ${2 * st}px)`;
+  el.insertAdjacentHTML('beforeend', `<div class="keys" style="margin-top:10px">
+      <span class="key"><i style="${dash('#b9a6ff', 2)}"></i>K⁰, Λ</span>
+      <span class="key"><i style="${dash('#5d6c8a', 1.5)}"></i>ν</span>
+      <span class="key muted">hits: VT · MS</span>
+    </div>
+    <h2 class="sub">Detector</h2><div class="keys">
+      <span class="key"><i style="background:#5fd3c6"></i>VT</span>
+      <span class="key"><i style="background:#c79bff"></i>BeO</span>
+      <span class="key"><i style="background:#7d8db0"></i>graphite</span>
+      <span class="key"><i style="background:#8fa3c8"></i>W plug</span>
+      <span class="key"><i style="background:#8fa9d4"></i>MS</span>
+      <span class="key"><i style="background:#c44a3a"></i>magnets</span>
+    </div>`);
+}
+
+/* ---------------- labels ---------------- */
+const LABELS = [
+  ['Targets', '5 × Pb', [0, 0.012, -0.024], 'vtx'],
+  ['VT', 'MAPS · 7–38 cm', [VT_H, VT_H + 0.01, 0.38]],
+  ['MEP48', '1.47 T', [0, MEP.gapH + 0.28, MEP.zc]],
+  ['BeO', '', [0, absH(0.75) + 0.02, 0.75]],
+  ['Graphite', 'absorber', [0, absH(2.7) + 0.02, 2.7]],
+  ...MS_Z.map((z, i) => [`MS${i}`, i === 0 ? 'MWPC' : '', [msHx(z), msHy(z) + 0.04, z]]),
+  ['MNP33', '0.9 T·m', [0, MNP.hy + 1.05, (MNP.z0 + MNP.z1) / 2]],
+  ['Muon wall', 'graphite', [0, msHy(10.4) + 0.15, 10.4]],
+  ['Pb beam', '', [0, 0.05, -2.5]],
+].map(([n, sub, p, only]) => {
+  const d = document.createElement('div'); d.className = 'lbl';
+  d.innerHTML = `<b>${n}</b>${sub ? ' · ' + sub : ''}`;
+  $('labels').appendChild(d);
+  return { d, v: new THREE.Vector3(...p), only };
+});
+LABELS.find(L => L.d.textContent.startsWith('Pb beam')).beam = true;
+const MOVERS = ['proj', 'targ'].map(kind => {
+  const d = document.createElement('div'); d.className = 'lbl pb';
+  $('labels').appendChild(d);
+  return { d, v: new THREE.Vector3(), kind };
+});
+const pv = new THREE.Vector3();
+function placeLabels() {
+  const w = innerWidth, h = innerHeight, near = camera.position.distanceTo(controls.target) < 0.7;
+  for (const L of MOVERS) {
+    const r = (ev.S.Ap > 1 || L.kind === 'targ' ? 7 : 1) * S;
+    if (L.kind === 'proj') { L.v.set(ev.PV[0], ev.PV[1] + 0.004 + r, ev.PV[2] + V_NUC * simT); L.d.innerHTML = `<b>${ev.S.proj}</b> beam`; }
+    else { L.v.set(ev.PV[0], ev.PV[1] - 0.004 - r, ev.PV[2]); L.d.innerHTML = `<b>${ev.S.targ}</b> target`; L.d.style.borderBottomColor = '#8fa3c4'; }
+  }
+  for (const L of [...LABELS, ...MOVERS]) {
+    if (L.kind && simT > 0.1) { L.d.hidden = true; continue; }
+    if (L.beam) L.d.innerHTML = `<b>${ev.S.proj} beam</b>`;
+    if (!L.kind && (!det.visible || (L.only === 'vtx' && !near))) { L.d.hidden = true; continue; }
+    pv.copy(L.v).project(camera);
+    const vis = pv.z < 1 && Math.abs(pv.x) < 1.05 && Math.abs(pv.y) < 1.05;
+    L.d.hidden = !vis;
+    if (vis) L.d.style.transform = `translate(${(pv.x * 0.5 + 0.5) * w}px,${(-pv.y * 0.5 + 0.5) * h}px) translate(-50%,-100%)`;
+  }
+}
+
+/* ---------------- camera presets ---------------- */
+// CAMERA DISTANCE: VIEW_ZOOM scales the four overview presets (bigger = further out); CLOSE_ZOOM scales the Vertex and VT views.
+const VIEW_ZOOM = 1.4;
+const CLOSE_ZOOM = 1.25;
+const VIEWS = {
+  v3d:   { p: [-7.2, 4.4, -3.4], t: [0, 0, 5.6], k: true },   // all presets: beam enters from the left, target on the left
+  vTop:  { p: [-1.0, 15.5, 5.6], t: [0, 0, 5.6], k: true },   // B ∥ y: the bending plane (x–z) faces the camera; beam runs left → right
+  vSide: { p: [-15.5, 0.6, 5.6], t: [0, 0, 5.6], k: true },
+  vVtx:  { p: [-0.075, 0.03, -0.035], t: [0, 0, 0.012], k: false },   // mm scale: target disks, charm flight, secondary vertex
+  vVT:   { p: [-0.42, 0.22, -0.22], t: [0, 0, 0.17], k: false },      // whole vertex telescope
+  vBeam: { p: [-0.7, 0.45, -4.0], t: [0, 0, 3.0], k: true },
+};
+let tween = null;
+function setView(id, instant) {
+  const V = VIEWS[id], k = (innerWidth / innerHeight < 1 ? 1.55 : 1) * (V.k ? VIEW_ZOOM : CLOSE_ZOOM);
+  const tt = new THREE.Vector3(...V.t), to = new THREE.Vector3(...V.p).sub(tt).multiplyScalar(k).add(tt);
+  for (const b of Object.keys(VIEWS)) $(b).setAttribute('aria-pressed', b === id);
+  if (instant) { camera.position.copy(to); controls.target.copy(tt); return; }
+  tween = { from: camera.position.clone(), to, t: 0, tf: controls.target.clone(), tt };
+}
+
+/* ---------------- UI wiring ---------------- */
+function fillEnergies() {
+  const S_ = SYSTEMS[$('iSys').value], sel = $('iE');
+  sel.innerHTML = S_.energies.map(e => `<option value="${e}"${e === S_.def ? ' selected' : ''}>${e} ${S_.unit}</option>`).join('');
+  $('iCent').disabled = S_.Ap === 1;
+  $('oCent').textContent = S_.Ap === 1 ? 'MB' : `${$('iCent').value}–${+$('iCent').value + 5}%`;
+}
+$('hudToggle').onclick = () => { const c = $('hud').classList.toggle('collapsed'); $('hudToggle').setAttribute('aria-expanded', !c); };
+$('bNext').onclick = newEvent;
+$('bReplay').onclick = replay;
+$('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? 'Play' : 'Pause'; $('bPause').setAttribute('aria-pressed', paused); };
+$('iSys').onchange = () => { fillEnergies(); newEvent(); };
+$('iE').onchange = newEvent;
+$('iSig').onchange = newEvent;
+$('iCent').oninput = e => { $('oCent').textContent = `${e.target.value}–${+e.target.value + 5}%`; };
+$('iCent').onchange = newEvent;
+$('iColor').onchange = e => { colorMode = e.target.value; recolor(); };
+$('iSpeed').oninput = e => { speed = +e.target.value; $('oSpeed').textContent = speed.toFixed(1) + '×'; };
+$('cDet').onchange = e => { det.visible = e.target.checked; };
+$('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
+$('cUE').onchange = e => { uUE.value = e.target.checked ? 1 : 0; };
+$('cLoop').onchange = e => { autoLoop = e.target.checked; };
+$('cRot').onchange = e => { controls.autoRotate = e.target.checked; };
+const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+function fmtLen(m) {
+  const U = [[1, 'm'], [1e-2, 'cm'], [1e-3, 'mm'], [1e-6, 'µm'], [1e-9, 'nm'], [1e-12, 'pm'], [1e-15, 'fm']];
+  const [s, u] = U.find(([s]) => m >= s * 0.999) || U[U.length - 1];
+  const v = m / s;
+  return `${v < 10 ? v.toFixed(1) : v.toFixed(0)} ${u}`;
+}
+function setZoom(lg) {
+  const m = 10 ** lg;
+  S = m * 1e-15;
+  const e = Math.floor(lg + 1e-9), mant = m / 10 ** e;
+  const mag = m < 1.05 ? '1× (true size)' : e < 1 ? `${m.toFixed(1)}×` : `${mant.toFixed(1)}×10${String(e).split('').map(c => SUP[c]).join('')}`;
+  $('oZoom').textContent = `${mag} · R_Pb ${fmtLen(7.1e-15 * m)}`;
+}
+$('iZoom').max = Math.log10(S0 / 1e-15).toFixed(2);
+$('iZoom').oninput = e => setZoom(+e.target.value);
+for (const id of Object.keys(VIEWS)) $(id).onclick = () => setView(id);
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); $('bPause').click(); }
+  if (e.key === 'n') newEvent();
+});
+// keep the scene centred in the space above the control rail (projection shifted up by half the rail height)
+function fitView() {
+  const rail = $('controls').getBoundingClientRect().height + 16;
+  camera.aspect = innerWidth / innerHeight;
+  camera.setViewOffset(innerWidth, innerHeight, 0, Math.round(rail / 2), innerWidth, innerHeight);
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); fitView(); });
+fitView();
+
+/* ---------------- go ---------------- */
+fillEnergies();
+setZoom(+$('iZoom').value);
+// URL options (handy for sharing a frame): ?sys=PbPb&e=150&sig=cmumu&view=vTop&t=6&pause
+const QS = new URLSearchParams(location.search);
+for (const [k, id] of [['sys', 'iSys'], ['sig', 'iSig'], ['color', 'iColor']]) if (QS.has(k)) { $(id).value = QS.get(k); if (k === 'sys') fillEnergies(); if (k === 'color') colorMode = $(id).value; }
+if (QS.has('e')) $('iE').value = QS.get('e');
+setView(VIEWS[QS.get('view')] ? QS.get('view') : 'v3d', true);
+newEvent();
+if (QS.has('t')) { simT = +QS.get('t'); uT.value = reveal(simT - T0); }
+if (QS.has('pause')) $('bPause').click();
+if (QS.has('view') && QS.get('view') !== 'v3d') { controls.autoRotate = false; $('cRot').checked = false; }
+const clock = new THREE.Clock();
+let shotReq = null;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!paused) simT += dt * speed;
+  if (autoLoop && !paused && simT > T0 + revealTime(ev.maxPath) + 2.6) newEvent();   // before the clock uniforms, so a new event never renders with the old event's time
+  updateNuclei(simT);
+  updateFire(simT);
+  uT.value = reveal(simT - T0);
+  phaseUpdate(simT);
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 0.9);
+    const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
+    camera.position.lerpVectors(tween.from, tween.to, e);
+    controls.target.lerpVectors(tween.tf, tween.tt, e);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+  if (!$('labels').hidden) placeLabels();
+  if (post) post.render(); else renderer.render(scene, camera);
+  if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
+});
+
+/* ---------------- screenshot ---------------- */
+// Inside the Claude viewer: save through the downloads capability. Standalone (file opened in a browser): plain <a download>.
+let downloads = null;
+const inViewer = typeof window.claude?.use === 'function';
+$('bShot').hidden = false;
+if (inViewer) (async () => { try { downloads = await window.claude.use('downloads'); } catch (e) { downloads = null; } })();
+function saveLocally(blob, filename) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function composeShot(done) {
+  const src = renderer.domElement, c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const k = c.width / innerWidth, pad = 18 * k;
+  g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
+  g.fillStyle = '#dfe6f3'; g.textBaseline = 'bottom';
+  g.fillText(`DiCE (NA60+) · ${ev.S.name} ${ev.cfg.pBeam} ${ev.S.unit} · √sNN = ${ev.K.rs.toFixed(1)} GeV · ${SIG_TXT[ev.sig.kind]} · toy MC`, pad, c.height - pad - 18 * k);
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = '#8796b1';
+  g.fillText(`Event #${String(evNo).padStart(3, '0')} · ${ev.S.Ap > 1 ? 'centrality ' + ev.gl.c.toFixed(1) + '% · ' : ''}b = ${ev.gl.b.toFixed(2)} fm · Npart ${ev.gl.npart} · ${ev.nMuTrig} triggered μ${ev.mmm ? ' · Mμμ = ' + ev.mmm.toFixed(3) + ' GeV' : ''}${ev.charm ? ' · L = ' + fmtL(ev.charm.L) : ''}`, pad, c.height - pad);
+  c.toBlob(done, 'image/png');
+}
+$('bShot').onclick = () => {
+  const b = $('bShot');
+  shotReq = async blob => {
+    if (!blob) { b.textContent = 'Screenshot failed'; return; }
+    const filename = `dice-${ev.cfg.sys}-${ev.sig.kind}-event-${String(evNo).padStart(3, '0')}.png`;
+    if (!downloads) {
+      if (inViewer) { b.textContent = 'Save unavailable'; setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return; }
+      saveLocally(blob, filename); b.textContent = 'Saved';
+      setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return;
+    }
+    try { await downloads.save({ filename, data: blob }); b.textContent = 'Saved'; }
+    catch (e) {
+      b.textContent = e?.code === 'declined' ? 'Save screenshot' : 'Save unavailable';
+      if (['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e?.code)) b.hidden = true;
+    }
+    setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800);
+  };
+};
+
+function fail(msg) {
+  const d = document.createElement('div'); d.id = 'fail'; d.textContent = msg; app.prepend(d);
+  $('phaseName').textContent = 'Renderer unavailable'; $('phaseNote').textContent = msg;
+}
+</script>
+</body>
+</html>
