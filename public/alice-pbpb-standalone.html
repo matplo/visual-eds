@@ -126,7 +126,7 @@ input[type=checkbox]{accent-color:var(--amber)}
     <div class="eyebrow">LHC Run 3 · Pb–Pb · toy MC</div>
     <h1><button id="hudToggle" type="button" aria-expanded="false" aria-controls="hudBody">ALICE Event Display<span class="chev" aria-hidden="true">▾</span></button></h1>
     <div id="hudBody" class="hud-body">
-    <div class="beam">√s<sub>NN</sub> = 5.36 TeV · L3 solenoid B = 0.5 T</div>
+    <div class="beam">√s<sub>NN</sub> = 5.36 TeV · Run 3 layout · L3 0.5 T · dipole 0.67 T</div>
     <dl class="stats">
       <div><dt>Event</dt><dd id="sEv">—</dd></div>
       <div><dt>Centrality</dt><dd id="sCent">—</dd></div>
@@ -140,6 +140,13 @@ input[type=checkbox]{accent-color:var(--amber)}
       <div><dt>Towers &gt;0.1 GeV</dt><dd id="sTw">—</dd></div>
       <div><dt>ΣE cal (GeV)</dt><dd id="sSE">—</dd></div>
       <div class="hide-sm"><dt>γ in acc.</dt><dd id="sNg">—</dd></div>
+      <div><dt>MFT hits</dt><dd id="sMft">—</dd></div>
+      <div><dt>FT0 + FV0 hits</dt><dd id="sFit">—</dd></div>
+      <div class="hide-sm"><dt>FDD hits</dt><dd id="sFdd">—</dd></div>
+      <div><dt>μ MCH / MID</dt><dd id="sMu">—</dd></div>
+      <div><dt>m<sub>μμ</sub> J/ψ (GeV)</dt><dd id="sMmm">—</dd></div>
+      <div class="hide-sm"><dt>ZN-A / ZN-C (n)</dt><dd id="sZn">—</dd></div>
+      <div class="hide-sm"><dt>ZP-A / ZP-C (p)</dt><dd id="sZp">—</dd></div>
     </dl>
     </div>
     <div class="phase" aria-live="polite">
@@ -154,7 +161,15 @@ input[type=checkbox]{accent-color:var(--amber)}
         <li><i>Flow</i>: v₂ = 0.23 ε₂ (participant plane), p<sub>T</sub>-dependent; p<sub>T</sub> spectra Γ-shaped with mass-ordered slopes (π, K, p) plus a power-law tail.</li>
         <li><i>Tracking</i>: helices with R[m] = p<sub>T</sub>/(0.3·B), hits on 7 ITS2 layers and TOF. Geometry after ALICE, JINST 3 S08002 (2008) and ITS upgrade TDR, J.Phys.G 41, 087002 (2014).</li>
         <li><i>EMCal/DCal</i>: 20 supermodules (EMCal 10 full + 2×⅓, DCal 6×⅔ + 2×⅓), 4416 modules, 17 664 Pb–scintillator towers, Δη×Δφ ≈ 0.0143×0.0143, projective; EMCal |η|&lt;0.7, 80°&lt;φ&lt;187°; DCal 0.22&lt;|η|&lt;0.7, 260°&lt;φ&lt;320° and |η|&lt;0.7, 320°&lt;φ&lt;327° (<a href="https://alice-collaboration.web.cern.ch/menu_proj_items/emcal" target="_blank" rel="noopener">ALICE EMCal page</a>). Front face at r = 4.28 m. σ<sub>E</sub>/E = 1.7% ⊕ 11.3%/√E ⊕ 4.8%/E (test beam, arXiv:1008.0413; ALICE, JINST 18, P08007, 2023).</li>
-        <li><i>Neutrals</i>: π⁰ (≈ π⁺ yield) and η (η/π⁰ ≈ 0.11) decay to γγ; photons shower over ~3×3 towers. Charged hadrons: 62% MIP (≈ 0.27 GeV), the rest a partial hadronic shower. No PHOS.</li>
+        <li><i>Neutrals</i>: π⁰ (≈ π⁺ yield) and η (η/π⁰ ≈ 0.11) decay to γγ; photons shower over ~3×3 towers. Charged hadrons: 62% MIP (≈ 0.27 GeV), the rest a partial hadronic shower.</li>
+        <li><i>Run 3 layout</i>: after ALICE, “ALICE upgrades during the LHC Long Shutdown 2”, JINST 19, P05062 (2024). Positions are approximate; the far-forward beam line is schematic.</li>
+        <li><i>PHOS</i> (tick box, off by default): PbWO₄, 2.2 × 2.2 cm crystals at r = 4.6 m, |η| &lt; 0.13, 250°–320° (3 full + 1 half module), CPV outline; σ<sub>E</sub>/E = 1.1% ⊕ 3.3%/√E ⊕ 1.8%/E. <i>HMPID</i>: 7 RICH modules at r ≈ 4.9 m, 1.2°–58.8° in φ (schematic placement); tracks there end with a hit.</li>
+        <li><i>MFT</i>: 5 disks × 2 planes at z = −46 to −77 cm, −3.6 &lt; η &lt; −2.5 (MFT TDR, CERN-LHCC-2015-001).</li>
+        <li><i>FIT</i>: FT0-A (24 quartz modules, z = +3.35 m, 3.5 &lt; η &lt; 4.9), FT0-C (28 modules on a sphere of r = 0.84 m, −3.3 &lt; η &lt; −2.1), FV0 (5 rings × 8 sectors, z = +3.2 m, 2.2 &lt; η &lt; 5.0), FDD-A/C (z ≈ +17 m / −19.5 m, 4.7 &lt; η &lt; 6.3, −6.9 &lt; η &lt; −4.9; hits only).</li>
+        <li><i>Forward multiplicity</i>: dN/dη flat to |η| ≈ 2.5, then falling as exp[−(|η|−2.5)²/8] (shape after ALICE, PLB 772, 567, 2017). Forward hadrons are drawn dimmed.</li>
+        <li><i>Muon spectrometer</i>, −4 &lt; η &lt; −2.5: front absorber z = −0.9 to −5.03 m (C, concrete, steel; ≈ 10 λ<sub>I</sub>), W beam shield, dipole 0.67 T (3 T·m) at z = −7.4 to −12.4 m, MCH 5 stations (10 planes), 1.2 m iron filter, MID 2 × 2 RPC planes at z ≈ −16 and −17 m (Muon TDR, CERN-LHCC-99-022). Muons: Lorentz-force stepping, mean dE/dx and multiple scattering; hadrons stop after an exponential depth (λ ≈ 0.43 m).</li>
+        <li><i>Muon sources</i>: π/K → μν in flight before the absorber; heavy-flavour muons (toy: 1.5 × 10⁻³ per binary collision, p<sub>T</sub> &gt; 1 GeV/c); one J/ψ → μ⁺μ⁻ per event (tick box), m<sub>μμ</sub> smeared by 70 MeV/c² when both muons cross ≥ 7 MCH planes.</li>
+        <li><i>ZDC</i>: ZN (W, 0°) and ZP (brass, beside the outgoing beam pipe) at ±112.5 m, ZEM at +7.35 m (ZDC TDR, CERN-LHCC-99-005). Toy free-spectator fraction 0.3 + 0.5 N<sub>part</sub>/416; neutrons 126/208; E<sub>ZN</sub> = n × 2.68 TeV. Spectators accelerate on screen to reach the ZDCs about 3 display-seconds after impact.</li>
         <li><i>Nuclei scale</i>: drawn at true size by default (R<sub>Pb</sub> ≈ 7.1 fm, far below a pixel at detector scale); the Nuclei zoom slider magnifies them, and the QGP fireball with them, up to ≈ 4.5×10¹³. Lorentz contraction drawn at γ = 12 (true γ ≈ 2.9×10³). T<sub>ch</sub> ≈ 156 MeV (Nature 561, 321, 2018).</li>
       </ul>
     </details>
@@ -190,6 +205,9 @@ input[type=checkbox]{accent-color:var(--amber)}
       <button id="v3d" aria-pressed="true">3D</button>
       <button id="vBeam" aria-pressed="false">Beam axis</button>
       <button id="vSide" aria-pressed="false">Side</button>
+      <button id="vMuon" aria-pressed="false">Muon arm</button>
+      <button id="vZdc" aria-pressed="false">ZDC-A</button>
+      <button id="vFar" aria-pressed="false">Far (±115 m)</button>
     </div>
     <div class="grp zoom">
       <span>Nuclei zoom</span>
@@ -203,6 +221,8 @@ input[type=checkbox]{accent-color:var(--amber)}
     </div>
     <div class="grp">
       <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cPhos" type="checkbox">PHOS</label>
+      <label class="chk"><input id="cJpsi" type="checkbox" checked>J/ψ → μ⁺μ⁻</label>
       <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
       <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
       <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
@@ -235,28 +255,100 @@ const BFIELD = 0.5;                    // T
 const GAMMA_VIS = 12;                  // drawn Lorentz contraction
 const V_NUC = 1.6;                     // display m/s for the nuclei
 const T0 = 0.55;                       // display s when tracks start
-const V_TRK = 2.8;                     // display m/s for track reveal
+const V_TRK = 2.8;                     // display m/s for track reveal in the central barrel
+// TRACK REVEAL: path length (m) vs display time: 2.8 m/s through the barrel (first 6.2 m), then 8 m/s out to the muon arm and FDD
+const REV = [[2.2, V_TRK], [1e9, 8.0]];
+function reveal(tau) {
+  if (tau < 0) return 0;
+  let s = 0;
+  for (const [dt, v] of REV) { if (tau <= dt) return s + v * tau; s += v * dt; tau -= dt; }
+  return s;
+}
+function revealTime(path) {
+  let t = 0, s = 0;
+  for (const [dt, v] of REV) { if (path <= s + v * dt) return t + (path - s) / v; s += v * dt; t += dt; }
+  return t;
+}
+// spectators: drift in with the beam, then accelerate (display only) to reach the ZDCs at ±112.5 m about 3 display-s after impact
+const specZ = t => t < 0 ? V_NUC * t : V_NUC * t + 4 * t * t * t;
+const T_ZDC = 2.95;
 const ITS_R  = [0.022,0.028,0.036,0.196,0.245,0.344,0.393];
 const ITS_HL = [0.135,0.135,0.135,0.422,0.422,0.737,0.737];
 const TPC_RIN = 0.85, TPC_ROUT = 2.5, TPC_HL = 2.5;
 const TOF_R = 3.75, TOF_HL = 3.7;
 const LAYERS = ITS_R.map((lr, i) => [lr, ITS_HL[i], 0.006]).concat([[TOF_R, TOF_HL, 0.03]]);
-const MAXTRK = 4600, MAXSEG = 100, MAXV = MAXTRK * MAXSEG * 2, MAXH = MAXTRK * 9;
+const MAXSEG = 100, MAXV = 1400000, MAXH = 90000;   // shared track-vertex and hit budgets (central + forward)
 
 /* EMCal + DCal: 20 supermodules, tower = 1/4 module, Δφ = 20°/24, Δη = 0.7/48 */
 const EMC_R = 4.28, EMC_DEPTH = 0.25, D2R = Math.PI / 180, DPHI = 20 / 24 * D2R;
+const PHOS_R = 4.60, PHOS_CELL = 0.022, PHOS_DEPTH = 0.22;
+let phosOn = false;          // PHOS tick box (off by default)
+let jpsiOn = true;           // inject one J/ψ → μ⁺μ⁻ in the muon-arm acceptance
 const SMS = [];
 {
   let base = 0;
-  const add = (cal, phi0, nphi, eta0, eta1, neta) => { SMS.push({ cal, phi0: phi0 * D2R, nphi, eta0, neta, deta: (eta1 - eta0) / neta, base }); base += nphi * neta; };
+  const add = (cal, phi0, nphi, eta0, eta1, neta) => { SMS.push({ cal, phi0: phi0 * D2R, nphi, eta0, neta, deta: (eta1 - eta0) / neta, base, R: EMC_R, dphi: DPHI, w: 0.028, phos: false }); base += nphi * neta; };
   for (let k = 0; k < 5; k++) { add('EMCal', 80 + 20 * k, 24, 0, 0.7, 48); add('EMCal', 80 + 20 * k, 24, -0.7, 0, 48); }   // 10 full
   add('EMCal', 180, 8, 0, 0.7, 48); add('EMCal', 180, 8, -0.7, 0, 48);                                              // 2 × 1/3
   for (let k = 0; k < 3; k++) { add('DCal', 260 + 20 * k, 24, 0.22, 0.7, 32); add('DCal', 260 + 20 * k, 24, -0.7, -0.22, 32); } // 6 × 2/3
   add('DCal', 320, 8, 0, 0.7, 48); add('DCal', 320, 8, -0.7, 0, 48);                                                // 2 × 1/3
+  // PHOS (optional, off by default): PbWO₄ crystals 2.2 × 2.2 cm at r = 4.6 m, 56 (z) × 64 (φ) per module; 1 half + 3 full modules, 250°–320°
+  const cellA = PHOS_CELL / PHOS_R;
+  for (const [ph0, nphi] of [[250 + (10 - 32 * cellA / D2R) / 2, 32], [261.25, 64], [281.25, 64], [301.25, 64]]) {
+    SMS.push({ cal: 'PHOS', phi0: ph0 * D2R, nphi, eta0: -28 * cellA, neta: 56, deta: cellA, base, R: PHOS_R, dphi: cellA, w: 0.0102, phos: true });
+    base += nphi * 56;
+  }
 }
-const NTOW = SMS.reduce((a, s) => a + s.nphi * s.neta, 0);   // 17 664
+const NTOW = SMS.reduce((a, s) => a + s.nphi * s.neta, 0);   // 17 664 EMCal/DCal + 12 544 PHOS
+const MAXFIRE = 9000;                                          // fired towers drawn per event
 const towE = new Float32Array(NTOW), towT = new Float32Array(NTOW);
 const normPhi = p => ((p % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+
+/* ---------------- Run 3 forward / muon-arm / far-forward layout (m; A side z > 0, C side z < 0) ---------------- */
+// MFT: 5 disks (2 detection planes each), −3.6 < η < −2.5
+const MFT_Z = [-0.460, -0.493, -0.531, -0.687, -0.768];
+const MFT_PLANES = MFT_Z.flatMap(z => [z + 0.006, z - 0.006]);
+const mftRin = z => Math.abs(z) / Math.sinh(3.6), mftRout = z => Math.abs(z) / Math.sinh(2.5);
+// FIT: FT0-A (24 quartz modules, z = +3.345 m), FT0-C (28 modules on a sphere of radius 0.84 m), FV0 (5 rings × 8 sectors, z = +3.2 m), FDD-A/C
+const FT0_PITCH = 0.053, FT0_H = 0.0265, FT0A_Z = 3.345, FT0C_RS = 0.84, FT0C_ZP = -0.82, FV0_Z = 3.20;
+const FT0A_MOD = [], FT0C_MOD = [];
+for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) if (i || j) FT0A_MOD.push([i * FT0_PITCH, j * FT0_PITCH]);
+for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
+  const cx = (i - 2.5) * FT0_PITCH, cy = (j - 2.5) * FT0_PITCH;
+  if (Math.abs(cx) < FT0_PITCH && Math.abs(cy) < FT0_PITCH) continue;          // beam-pipe opening
+  if (Math.abs(cx) > 2 * FT0_PITCH && Math.abs(cy) > 2 * FT0_PITCH) continue;  // corners
+  FT0C_MOD.push([cx, cy]);
+}
+const ft0cZ = (x, y) => -Math.sqrt(FT0C_RS * FT0C_RS - x * x - y * y);
+const FV0_ETA = [5.0, 4.0, 3.5, 3.0, 2.5, 2.2];
+const FDD = [{ z: 16.95, h: 0.155, hole: 0.032, side: 'A' }, { z: -19.5, h: 0.155, hole: 0.040, side: 'C' }];
+// muon spectrometer (C side): front absorber, beam shield, dipole, 5 MCH stations, iron filter, 2 MID stations; −4 < η < −2.5
+const ABS_Z0 = -0.90, ABS_Z1 = -5.03;
+const absR = z => 0.176 * Math.abs(z) + 0.02;          // outer cone (≈ 10°)
+const shieldR = z => 0.035 * Math.abs(z) + 0.005;      // tungsten/lead beam shield (≈ 2°)
+const ABS_PARTS = [                                     // dE/dx for few-GeV μ (≈ 1.2 × minimum), X₀, λ_I
+  { name: 'C', a0: 0.90, a1: 3.85, dEdx: 0.40, X0: 0.22, lam: 0.45, hex: '#7d8db0' },
+  { name: 'concrete', a0: 3.85, a1: 4.60, dEdx: 0.55, X0: 0.115, lam: 0.42, hex: '#9fb7e0' },
+  { name: 'steel', a0: 4.60, a1: 5.03, dEdx: 1.35, X0: 0.0176, lam: 0.17, hex: '#8fa3c8' },
+];
+const MAT_W = { dEdx: 2.4, X0: 0.0035, lam: 0.10 }, MAT_FE = { dEdx: 1.35, X0: 0.0176, lam: 0.17 };
+const DIP = { z0: -12.44, z1: -7.44, B: 0.67 };       // 0.67 T horizontal (Bx), ≈ 3 T·m, bends in the vertical plane
+const apH = z => 0.176 * Math.abs(z) + 0.30;           // dipole aperture half-size
+const MCH_Z = [-5.26, -5.45, -6.76, -6.95, -9.60, -9.90, -12.65, -12.95, -14.10, -14.40];
+const mchH = z => 0.176 * Math.abs(z) + 0.10, mchHole = z => 0.035 * Math.abs(z) + 0.012;
+const FILTER = { z0: -15.80, z1: -14.60 };
+const MID_Z = [-16.12, -16.28, -17.12, -17.28];
+const midH = z => 0.176 * Math.abs(z) + 0.15, midHole = z => 0.035 * Math.abs(z) + 0.05;
+const MU_END = -17.6;
+// HMPID: 7 RICH modules (≈ 1.3 × 1.3 m) at r ≈ 4.9 m, 1.2° < φ < 58.8° (schematic placement)
+const HMPID_R = 4.90, HMPID_H = 0.65;
+const HMPID_MOD = [[9.5, -0.68], [9.5, 0.68], [29.5, -1.36], [29.5, 0], [29.5, 1.36], [49.5, -0.68], [49.5, 0.68]];   // [φ°, z]
+// far forward (both sides, schematic): inner triplet Q1–Q3, D1 separation dipole, ZDC at ±112.5 m, ZEM at +7.35 m
+const QUADS = [[22.96, 29.30], [32.0, 44.6], [46.6, 52.9]], D1 = [59.6, 69.0];
+const ZDC_Z = 112.5, ZN_H = 0.0352, ZN_L = 1.0, ZP = { x: 0.24, hx: 0.114, hy: 0.06, L: 1.5 }, PIPE_SEP = 0.097, PIPE_Z0 = 64.3;
+const pipeX = az => az <= PIPE_Z0 ? 0 : PIPE_SEP * (az - PIPE_Z0) / (ZDC_Z - PIPE_Z0);
+const ZEM_Z = 7.35;
+const E_BEAM_N = 2.68;   // TeV per nucleon (√s_NN = 5.36 TeV)
 
 /* nuclei magnification (slider) */
 const S0 = 0.3 / 6.62, MAG0 = S0 / 1e-15;
@@ -275,10 +367,10 @@ app.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x060a13, 26, 48);   // fog near/far (m): raise both if you zoom out further, so particles are not dimmed
-const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 200);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 400);   // near/far follow the orbit distance (see the render loop)
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
-controls.minDistance = 0.4; controls.maxDistance = 40;
+controls.minDistance = 0.4; controls.maxDistance = 420;
 controls.autoRotateSpeed = 0.6; controls.autoRotate = true;
 
 scene.add(new THREE.HemisphereLight(0xbfd2ff, 0x1a1408, 1.4));
@@ -289,6 +381,7 @@ const uT = uniform(0);          // track reveal path length (m)
 const uDet = uniform(1);
 const uFire = uniform(0);
 const uLight = uniform(0);       // 0 = dark theme, 1 = light theme
+const uSpec = uniform(0);        // distance (m) travelled by the spectator nucleons after the collision
 const themed = [];               // additive materials that switch to normal blending on a light background
 
 /* ---------------- detector ---------------- */
@@ -334,6 +427,54 @@ function ringLines(r, z, n, mat) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
   det.add(new THREE.LineSegments(g, mat));
 }
+function segs(v, mat, parent = det) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
+}
+function rectV(hx, hy, z, v = [], cx = 0, cy = 0) {
+  v.push(cx - hx, cy - hy, z, cx + hx, cy - hy, z, cx + hx, cy - hy, z, cx + hx, cy + hy, z, cx + hx, cy + hy, z, cx - hx, cy + hy, z, cx - hx, cy + hy, z, cx - hx, cy - hy, z);
+  return v;
+}
+function circV(r, z, n, v = []) {
+  for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2; v.push(r * Math.cos(a0), r * Math.sin(a0), z, r * Math.cos(a1), r * Math.sin(a1), z); }
+  return v;
+}
+function boxV(x0, x1, y0, y1, z0, z1, v = []) {
+  for (const z of [z0, z1]) v.push(x0, y0, z, x1, y0, z, x1, y0, z, x1, y1, z, x1, y1, z, x0, y1, z, x0, y1, z, x0, y0, z);
+  for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) v.push(x, y, z0, x, y, z1);
+  return v;
+}
+function frustumV(h0x, h0y, z0, h1x, h1y, z1, v = []) {
+  rectV(h0x, h0y, z0, v); rectV(h1x, h1y, z1, v);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) v.push(sx * h0x, sy * h0y, z0, sx * h1x, sy * h1y, z1);
+  return v;
+}
+function frustumMesh(h0x, h0y, z0, h1x, h1y, z1, mat) {
+  const g = new THREE.CylinderGeometry(Math.SQRT2 * h1x, Math.SQRT2 * h0x, Math.abs(z1 - z0), 4, 1, true);
+  g.rotateY(Math.PI / 4); g.rotateX(Math.PI / 2);
+  if (z1 < z0) g.rotateX(Math.PI);
+  g.translate(0, 0, (z0 + z1) / 2);
+  const m = new THREE.Mesh(g, mat); det.add(m); return m;
+}
+function coneMesh(r0, z0, r1, z1, mat) {   // open cone between (r0, z0) and (r1, z1)
+  const top = z1 > z0 ? r1 : r0, bot = z1 > z0 ? r0 : r1;
+  const g = new THREE.CylinderGeometry(top, bot, Math.abs(z1 - z0), 64, 1, true);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, (z0 + z1) / 2);
+  const m = new THREE.Mesh(g, mat); det.add(m); return m;
+}
+function fillMat(hex, op) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = float(op).mul(uDet).mul(mix(float(1), float(1.8), uLight));
+  themed.push(m);
+  return m;
+}
+function planeMesh(hx, hy, z, mat, cx = 0, cy = 0, parent = det) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * hx, 2 * hy), mat); m.position.set(cx, cy, z); parent.add(m); return m;
+}
+function ringMesh(rin, rout, z, mat, parent = det) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(rin, rout, 64, 1), mat); m.position.z = z; parent.add(m); return m;
+}
 // ITS2: 7 layers
 const itsMat = shellMat('#5fd3c6', 0.55, 0.035);
 ITS_R.forEach((r, i) => cyl(r, ITS_HL[i], itsMat, 48));
@@ -354,14 +495,16 @@ polyLines(2.95, 18, 3.5, Math.PI / 18, lineMat(0x8796b1, 0.13));
 polyLines(3.68, 18, 3.5, Math.PI / 18, lineMat(0x8796b1, 0.13));
 polyLines(TOF_R, 18, TOF_HL, Math.PI / 18, lineMat(0x9fb7e0, 0.22));
 polyLines(5.93, 8, 6.1, Math.PI / 8, lineMat(0xc44a3a, 0.22));
+// beam pipe: single pipe to ±64 m, then two pipes (incoming / outgoing) separated by 19.4 cm at the ZDCs
 {
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -12, 0, 0, 12], 3));
-  scene.add(new THREE.LineSegments(g, lineMat(0x8796b1, 0.35)));
+  const v = [0, 0, -PIPE_Z0, 0, 0, PIPE_Z0];
+  for (const sd of [1, -1]) for (const sx of [1, -1]) v.push(0, 0, sd * PIPE_Z0, sx * pipeX(ZDC_Z + 3), 0, sd * (ZDC_Z + 3));
+  segs(v, lineMat(0x8796b1, 0.35), scene);
 }
 
-// EMCal + DCal: front face of each supermodule with a procedural tower/module grid (TSL, fwidth-antialiased)
-const calMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-{
+// EMCal + DCal (+ optional PHOS): front face of each supermodule with a procedural cell/module grid (TSL, fwidth-antialiased)
+function calGridMat(hex, hexLight, modScale) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
   const uvT = attribute('uvT', 'vec2');
   const gridLine = (q, wmul) => {
     const f = fract(q), w = fwidth(q).mul(wmul);
@@ -371,35 +514,164 @@ const calMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: 
   };
   const fw = fwidth(uvT);
   const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
-  const tower = gridLine(uvT, 1.0).mul(fade);
-  const module = gridLine(uvT.mul(0.5), 1.4);
-  calMat.colorNode = mix(color('#c79bff'), color('#6a3fb8'), uLight);
-  calMat.opacityNode = float(0.03).add(tower.mul(0.17)).add(module.mul(0.24)).mul(uDet).mul(mix(float(1), float(1.5), uLight));
-  themed.push(calMat);
+  const fadeM = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y).mul(modScale)));
+  const cell = gridLine(uvT, 1.0).mul(fade);
+  const module = gridLine(uvT.mul(modScale), 1.4).mul(fadeM);
+  m.colorNode = mix(color(hex), color(hexLight), uLight);
+  m.opacityNode = float(0.03).add(cell.mul(0.17)).add(module.mul(0.24)).mul(uDet).mul(mix(float(1), float(1.5), uLight));
+  themed.push(m);
+  return m;
 }
-const calEdge = lineMat(0xc79bff, 0.42);
+const calMat = calGridMat('#c79bff', '#6a3fb8', 0.5);          // EMCal/DCal: module = 2 × 2 towers
+const phosMat = calGridMat('#7fd4ff', '#1f6f9a', 1 / 8);       // PHOS: strip unit = 8 crystals
+const phosGroup = new THREE.Group(); phosGroup.visible = false; det.add(phosGroup);
+const calEdge = lineMat(0xc79bff, 0.42), phosEdge = lineMat(0x7fd4ff, 0.45);
 for (const sm of SMS) {
-  const nU = sm.nphi, nV = sm.neta, pos = [], uv = [], idx = [];
+  const nU = sm.nphi, nV = sm.neta, pos = [], uv = [], idx = [], Rf = sm.R, dph = sm.dphi;
+  const parent = sm.phos ? phosGroup : det;
   for (let i = 0; i <= nU; i++) for (let j = 0; j <= nV; j++) {
-    const ph = sm.phi0 + i * DPHI, et = sm.eta0 + j * sm.deta;
-    pos.push(EMC_R * Math.cos(ph), EMC_R * Math.sin(ph), EMC_R * Math.sinh(et)); uv.push(i, j);
+    const ph = sm.phi0 + i * dph, et = sm.eta0 + j * sm.deta;
+    pos.push(Rf * Math.cos(ph), Rf * Math.sin(ph), Rf * Math.sinh(et)); uv.push(i, j);
   }
   for (let i = 0; i < nU; i++) for (let j = 0; j < nV; j++) { const a = i * (nV + 1) + j, b = a + nV + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uvT', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  det.add(new THREE.Mesh(g, calMat));
+  parent.add(new THREE.Mesh(g, sm.phos ? phosMat : calMat));
   // box outline: front & back faces (projective in η) and the four depth edges
-  const v = [], R2 = EMC_R + EMC_DEPTH, e0 = sm.eta0, e1 = sm.eta0 + nV * sm.deta;
+  const v = [], R2 = Rf + (sm.phos ? PHOS_DEPTH : EMC_DEPTH), e0 = sm.eta0, e1 = sm.eta0 + nV * sm.deta, st = sm.phos ? 8 : 2;
   const P = (R, ph, et) => [R * Math.cos(ph), R * Math.sin(ph), R * Math.sinh(et)];
-  for (const R of [EMC_R, R2]) {
-    for (const et of [e0, e1]) for (let i = 0; i < nU; i += 2) v.push(...P(R, sm.phi0 + i * DPHI, et), ...P(R, sm.phi0 + Math.min(i + 2, nU) * DPHI, et));
-    for (const i of [0, nU]) v.push(...P(R, sm.phi0 + i * DPHI, e0), ...P(R, sm.phi0 + i * DPHI, e1));
+  for (const R of [Rf, R2]) {
+    for (const et of [e0, e1]) for (let i = 0; i < nU; i += st) v.push(...P(R, sm.phi0 + i * dph, et), ...P(R, sm.phi0 + Math.min(i + st, nU) * dph, et));
+    for (const i of [0, nU]) v.push(...P(R, sm.phi0 + i * dph, e0), ...P(R, sm.phi0 + i * dph, e1));
   }
-  for (const i of [0, nU]) for (const et of [e0, e1]) v.push(...P(EMC_R, sm.phi0 + i * DPHI, et), ...P(R2, sm.phi0 + i * DPHI, et));
-  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-  det.add(new THREE.LineSegments(lg, calEdge));
+  for (const i of [0, nU]) for (const et of [e0, e1]) v.push(...P(Rf, sm.phi0 + i * dph, et), ...P(R2, sm.phi0 + i * dph, et));
+  segs(v, sm.phos ? phosEdge : calEdge, parent);
+}
+// PHOS charged-particle veto (CPV) in front of modules 2–4 (outline only)
+{
+  const v = [], Rc = PHOS_R - 0.12;
+  for (const sm of SMS.filter(m => m.phos && m.nphi === 64)) {
+    const e0 = sm.eta0, e1 = sm.eta0 + sm.neta * sm.deta, p0 = sm.phi0, p1 = sm.phi0 + sm.nphi * sm.dphi;
+    const P = (ph, et) => [Rc * Math.cos(ph), Rc * Math.sin(ph), Rc * Math.sinh(et)];
+    v.push(...P(p0, e0), ...P(p1, e0), ...P(p1, e0), ...P(p1, e1), ...P(p1, e1), ...P(p0, e1), ...P(p0, e1), ...P(p0, e0));
+  }
+  segs(v, lineMat(0x7fd4ff, 0.30), phosGroup);
+}
+
+/* ---------------- HMPID, forward detectors, muon arm, far forward ---------------- */
+// HMPID: 7 flat RICH modules tangent at r = 4.9 m
+{
+  const m = fillMat('#ffd27a', 0.06), v = [];
+  for (const [pd, zc] of HMPID_MOD) {
+    const ph = pd * D2R, c = new THREE.Vector3(HMPID_R * Math.cos(ph), HMPID_R * Math.sin(ph), zc);
+    const t = new THREE.Vector3(-Math.sin(ph), Math.cos(ph), 0), zz = new THREE.Vector3(0, 0, 1);
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(2 * HMPID_H, 2 * HMPID_H), m);
+    pl.position.copy(c); pl.lookAt(0, 0, zc); det.add(pl);
+    const k = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => c.clone().addScaledVector(t, a * HMPID_H).addScaledVector(zz, b * HMPID_H));
+    for (let i = 0; i < 4; i++) v.push(...k[i].toArray(), ...k[(i + 1) % 4].toArray());
+    const back = k.map(q => q.clone().addScaledVector(c.clone().setZ(0).normalize(), 0.25));
+    for (let i = 0; i < 4; i++) v.push(...back[i].toArray(), ...back[(i + 1) % 4].toArray(), ...k[i].toArray(), ...back[i].toArray());
+  }
+  segs(v, lineMat(0xffd27a, 0.40));
+}
+// MFT: 5 disks, two detection planes each
+{
+  const m = fillMat('#5fd3c6', 0.10), v = [];
+  for (const z of MFT_Z) {
+    ringMesh(mftRin(z), mftRout(z), z, m);
+    circV(mftRin(z), z, 40, v); circV(mftRout(z), z, 64, v);
+    v.push(-mftRout(z), 0, z, -mftRin(z), 0, z, mftRin(z), 0, z, mftRout(z), 0, z);
+  }
+  segs(v, lineMat(0x5fd3c6, 0.55));
+}
+// FIT: FT0-A and FT0-C quartz modules, FV0 rings, FDD pads
+{
+  const m = fillMat('#ff9f5a', 0.16), v = [];
+  for (const [cx, cy] of FT0A_MOD) { planeMesh(FT0_H * 0.92, FT0_H * 0.92, FT0A_Z, m, cx, cy); rectV(FT0_H * 0.92, FT0_H * 0.92, FT0A_Z, v, cx, cy); }
+  for (const [cx, cy] of FT0C_MOD) { const z = ft0cZ(cx, cy); planeMesh(FT0_H * 0.92, FT0_H * 0.92, z, m, cx, cy); rectV(FT0_H * 0.92, FT0_H * 0.92, z, v, cx, cy); }
+  segs(v, lineMat(0xff9f5a, 0.55));
+  const fv = [], rr = FV0_ETA.map(e => FV0_Z / Math.sinh(e));
+  ringMesh(rr[0], rr[rr.length - 1], FV0_Z, fillMat('#ff9f5a', 0.05));
+  for (const r of rr) circV(r, FV0_Z, 64, fv);
+  for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; fv.push(rr[0] * Math.cos(a), rr[0] * Math.sin(a), FV0_Z, rr[5] * Math.cos(a), rr[5] * Math.sin(a), FV0_Z); }
+  segs(fv, lineMat(0xff9f5a, 0.40));
+  const fd = [];
+  for (const F of FDD) for (const dz of [-0.03, 0.03]) {
+    planeMesh(F.h, F.h, F.z + dz, fillMat('#ff9f5a', 0.06));
+    rectV(F.h, F.h, F.z + dz, fd); rectV(F.hole, F.hole, F.z + dz, fd);
+    fd.push(-F.h, 0, F.z + dz, -F.hole, 0, F.z + dz, F.hole, 0, F.z + dz, F.h, 0, F.z + dz, 0, -F.h, F.z + dz, 0, -F.hole, F.z + dz, 0, F.hole, F.z + dz, 0, F.h, F.z + dz);
+  }
+  segs(fd, lineMat(0xff9f5a, 0.5));
+}
+// ZEM: two small EM calorimeters beside the beam pipe at z = +7.35 m
+{
+  const v = [];
+  for (const sx of [1, -1]) boxV(sx * 0.045, sx * 0.115, -0.035, 0.035, ZEM_Z, ZEM_Z + 0.21, v);
+  segs(v, lineMat(0x7fd4ff, 0.5));
+}
+// front absorber (C, concrete, steel) with the tungsten beam shield inside, continuing through the spectrometer
+for (const a of ABS_PARTS) {
+  coneMesh(absR(-a.a0), -a.a0, absR(-a.a1), -a.a1, shellMat(a.hex, 0.16, a.name === 'steel' ? 0.03 : 0.018));
+  const v = []; circV(absR(-a.a0), -a.a0, 64, v); circV(absR(-a.a1), -a.a1, 64, v);
+  for (let k = 0; k < 4; k++) { const ph = k * Math.PI / 2 + Math.PI / 4; v.push(absR(-a.a0) * Math.cos(ph), absR(-a.a0) * Math.sin(ph), -a.a0, absR(-a.a1) * Math.cos(ph), absR(-a.a1) * Math.sin(ph), -a.a1); }
+  segs(v, lineMat(new THREE.Color(a.hex).getHex(), 0.38));
+}
+coneMesh(shieldR(ABS_Z0), ABS_Z0, shieldR(MU_END), MU_END, shellMat('#8fa3c8', 0.28, 0.03));
+// dipole: aperture following the 10° acceptance, coils left/right, window-frame yoke 6.6 m × 8.6 m
+{
+  const v = [];
+  frustumV(apH(DIP.z1), apH(DIP.z1), DIP.z1, apH(DIP.z0), apH(DIP.z0), DIP.z0, v);
+  boxV(-3.3, 3.3, -4.3, 4.3, DIP.z0, DIP.z1, v);
+  segs(v, lineMat(0xc44a3a, 0.28));
+  const zc = (DIP.z0 + DIP.z1) / 2, L = DIP.z1 - DIP.z0, h = apH(zc);
+  for (const sx of [1, -1]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.45, 2 * h + 0.6, L + 0.5), shellMat('#c44a3a', 0.22, 0.016));
+    m.position.set(sx * (h + 0.35), 0, zc); det.add(m);
+  }
+}
+// MCH: 10 tracking planes in 5 stations; iron muon filter; MID: 4 RPC planes
+{
+  const m = fillMat('#6f8db8', 0.035), v = [];
+  for (const z of MCH_Z) { planeMesh(mchH(z), mchH(z), z, m); rectV(mchH(z), mchH(z), z, v); rectV(mchHole(z), mchHole(z), z, v); }
+  segs(v, lineMat(0x8fa9d4, 0.45));
+  const fh0 = mchH(FILTER.z1) + 0.15, fh1 = mchH(FILTER.z0) + 0.15;
+  frustumMesh(fh0, fh0, FILTER.z1, fh1, fh1, FILTER.z0, shellMat('#7d8db0', 0.14, 0.012));
+  segs(frustumV(fh0, fh0, FILTER.z1, fh1, fh1, FILTER.z0), lineMat(0x7d8db0, 0.35));
+  const mm = fillMat('#6dffb2', 0.03), w = [];
+  for (const z of MID_Z) { planeMesh(midH(z), midH(z), z, mm); rectV(midH(z), midH(z), z, w); rectV(midHole(z), midHole(z), z, w); }
+  segs(w, lineMat(0x6dffb2, 0.40));
+}
+// far forward (both sides, schematic): inner-triplet quadrupoles Q1–Q3, D1 separation dipole, ZN and ZP
+const zdcGroup = new THREE.Group(); det.add(zdcGroup);
+{
+  const v = [];
+  for (const sd of [1, -1]) {
+    for (const [a, b] of QUADS) boxV(-0.3, 0.3, -0.3, 0.3, sd * a, sd * b, v);
+    boxV(-0.35, 0.35, -0.3, 0.3, sd * D1[0], sd * D1[1], v);
+  }
+  segs(v, lineMat(0xc44a3a, 0.35), zdcGroup);
+}
+const zdcU = { znA: uniform(0), znC: uniform(0), zpA: uniform(0), zpC: uniform(0) };
+function zdcMat(hex, uHit) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const lit = step(float(ZDC_Z), uSpec).mul(uHit);
+  m.colorNode = color(hex).mul(lit.mul(2.2).add(0.45));
+  m.opacityNode = float(0.30).add(lit.mul(0.6));
+  themed.push(m);
+  return m;
+}
+for (const sd of [1, -1]) {
+  const tag = sd > 0 ? 'A' : 'C', zc0 = sd * ZDC_Z;
+  const zn = new THREE.Mesh(new THREE.BoxGeometry(2 * ZN_H, 2 * ZN_H, ZN_L), zdcMat('#cfe0ff', zdcU['zn' + tag]));
+  zn.position.set(0, 0, zc0 + sd * ZN_L / 2); zdcGroup.add(zn);
+  const zp = new THREE.Mesh(new THREE.BoxGeometry(2 * ZP.hx, 2 * ZP.hy, ZP.L), zdcMat('#ff8f6b', zdcU['zp' + tag]));
+  zp.position.set(sd * ZP.x, 0, zc0 + sd * ZP.L / 2); zdcGroup.add(zp);
+  const v = [];
+  boxV(-ZN_H, ZN_H, -ZN_H, ZN_H, zc0, zc0 + sd * ZN_L, v);
+  boxV(sd * ZP.x - ZP.hx, sd * ZP.x + ZP.hx, -ZP.hy, ZP.hy, zc0, zc0 + sd * ZP.L, v);
+  segs(v, lineMat(0xcfe0ff, 0.6), zdcGroup);
 }
 
 /* ---------------- nuclei (instanced nucleons) ---------------- */
@@ -438,7 +710,7 @@ const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: 
   const ahead = uT.sub(pT);
   const head = exp(ahead.max(0).mul(-7)).mul(2.6).add(1);
   const rT = positionLocal.xy.length();
-  const outer = mix(float(1), float(0.4), smoothstep(2.45, 2.65, rT));
+  const outer = mix(float(1), float(0.4), smoothstep(2.45, 2.65, rT).mul(step(abs(positionLocal.z), float(4.0))));
   trkMat.colorNode = attribute('tcol', 'vec3').mul(mix(head, float(0.72), uLight));
   themed.push(trkMat);
   trkMat.opacityNode = step(pT, uT).mul(outer).mul(0.9);
@@ -463,19 +735,19 @@ hits.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(hits);
 /* ---------------- calorimeter towers: one mesh, 5 quads per fired tower, risen in the vertex stage ---------------- */
 const TV = 20;
 const twBuf = {
-  position: new Float32Array(NTOW * TV * 3), normal: new Float32Array(NTOW * TV * 3),
-  dH: new Float32Array(NTOW * TV * 3), ctr: new Float32Array(NTOW * TV * 3), ecol: new Float32Array(NTOW * TV * 3),
-  top: new Float32Array(NTOW * TV), tArr: new Float32Array(NTOW * TV),
+  position: new Float32Array(MAXFIRE * TV * 3), normal: new Float32Array(MAXFIRE * TV * 3),
+  dH: new Float32Array(MAXFIRE * TV * 3), ctr: new Float32Array(MAXFIRE * TV * 3), ecol: new Float32Array(MAXFIRE * TV * 3),
+  top: new Float32Array(MAXFIRE * TV), tArr: new Float32Array(MAXFIRE * TV),
 };
 const twGeo = new THREE.BufferGeometry();
 const twAttr = {};
 for (const [k, arr] of Object.entries(twBuf)) {
-  twAttr[k] = new THREE.BufferAttribute(arr, arr.length === NTOW * TV ? 1 : 3).setUsage(THREE.DynamicDrawUsage);
+  twAttr[k] = new THREE.BufferAttribute(arr, arr.length === MAXFIRE * TV ? 1 : 3).setUsage(THREE.DynamicDrawUsage);
   twGeo.setAttribute(k, twAttr[k]);
 }
 {
-  const idx = new Uint32Array(NTOW * 30);
-  for (let t = 0, o = 0; t < NTOW; t++) for (let q = 0; q < 5; q++) { const b = t * TV + q * 4; idx.set([b, b + 1, b + 2, b, b + 2, b + 3], o); o += 6; }
+  const idx = new Uint32Array(MAXFIRE * 30);
+  for (let t = 0, o = 0; t < MAXFIRE; t++) for (let q = 0; q < 5; q++) { const b = t * TV + q * 4; idx.set([b, b + 1, b + 2, b, b + 2, b + 3], o); o += 6; }
   twGeo.setIndex(new THREE.BufferAttribute(idx, 1));
 }
 twGeo.setDrawRange(0, 0);
@@ -555,9 +827,10 @@ const PT_STOPS = [0, 0.4, 1, 2, 4];
 const PT_COLS = ['#3b5bff', '#2fc4e0', '#7be38a', '#ffd166', '#ff5d3a'].map(h => new THREE.Color(h));
 const CH_COLS = { '1': new THREE.Color('#ff7a59'), '-1': new THREE.Color('#4fa3ff') };
 const SP = [
-  { name: 'π±', frac: 0.80, theta: 0.30, col: new THREE.Color('#7aa2ff') },
-  { name: 'K±', frac: 0.13, theta: 0.42, col: new THREE.Color('#ffd166') },
-  { name: 'p, p̄', frac: 0.07, theta: 0.56, col: new THREE.Color('#ff6b8b') },
+  { name: 'π±', frac: 0.80, theta: 0.30, col: new THREE.Color('#7aa2ff'), m: 0.1396, ctau: 7.80 },
+  { name: 'K±', frac: 0.13, theta: 0.42, col: new THREE.Color('#ffd166'), m: 0.4937, ctau: 3.71 },
+  { name: 'p, p̄', frac: 0.07, theta: 0.56, col: new THREE.Color('#ff6b8b'), m: 0.9383 },
+  { name: 'μ±', col: new THREE.Color('#6dffb2'), m: 0.1057 },                // forward muons only
 ];
 const tmpC = new THREE.Color();
 function trackColor(tr, mode) {
@@ -573,17 +846,22 @@ let ev = null, evNo = 0;
 let colorMode = 'pt';
 
 /* ---------------- calorimeter response ---------------- */
-function towerAt(eta, phi) {
+function towerAt(eta, phi, R = EMC_R) {
   for (const sm of SMS) {
-    const u = (phi - sm.phi0) / DPHI, v = (eta - sm.eta0) / sm.deta;
+    if (sm.R !== R || (sm.phos && !phosOn)) continue;
+    const u = (phi - sm.phi0) / sm.dphi, v = (eta - sm.eta0) / sm.deta;
     if (u >= 0 && u < sm.nphi && v >= 0 && v < sm.neta) return { sm, u, v };
   }
   return null;
 }
-// spread E over towers by sampling a transverse shower profile (σ in tower units; R_M ≈ 3.2 cm vs 6 cm towers)
-function deposit(eta, phi, E, tArr, sigma, nS) {
-  const h = towerAt(eta, phi); if (!h) return false;
+// spread E over cells by sampling a transverse shower profile (σ given in EMCal-tower units; scaled to the 2.2 cm PHOS crystals)
+function deposit(eta, phi, E, tArr, sigma, nS, R = EMC_R) {
+  const h = towerAt(eta, phi, R); if (!h) return false;
+  return depositAt(h, E, tArr, sigma, nS);
+}
+function depositAt(h, E, tArr, sigma, nS) {
   const { sm, u, v } = h, e = E / nS;
+  if (sm.phos) sigma *= 0.06 / PHOS_CELL * 0.55;
   for (let i = 0; i < nS; i++) {
     const iu = Math.floor(u + sigma * gauss()), iv = Math.floor(v + sigma * gauss());
     if (iu < 0 || iu >= sm.nphi || iv < 0 || iv >= sm.neta) continue;
@@ -594,6 +872,20 @@ function deposit(eta, phi, E, tArr, sigma, nS) {
   return true;
 }
 const emcSmear = E => E * (1 + gauss() * Math.sqrt(0.017 ** 2 + 0.113 ** 2 / E + 0.048 ** 2 / (E * E)));
+const phosSmear = E => E * (1 + gauss() * Math.sqrt(0.011 ** 2 + 0.033 ** 2 / E + 0.018 ** 2 / (E * E)));
+// where a charged track should stop: the outer detector in front of it (PHOS, HMPID, EMCal/DCal), else just behind TOF
+function hmpidAt(x, y, z) {
+  const ph = normPhi(Math.atan2(y, x)), r = Math.hypot(x, y), zz = z * HMPID_R / r;
+  for (const [pd, zc] of HMPID_MOD) if (Math.abs((ph - pd * D2R) * HMPID_R) < HMPID_H && Math.abs(zz - zc) < HMPID_H) return true;
+  return false;
+}
+function outerTarget(x, y, z) {
+  const r = Math.hypot(x, y), eta = Math.asinh(z / r), ph = normPhi(Math.atan2(y, x));
+  if (phosOn && towerAt(eta, ph, PHOS_R)) return PHOS_R;
+  if (hmpidAt(x, y, z)) return HMPID_R;
+  if (towerAt(eta, ph, EMC_R)) return EMC_R;
+  return TOF_R + 0.04;
+}
 
 // two-body decay M → γγ, isotropic in the rest frame, boosted to the lab
 function decayGG(m, E, px, py, pz) {
@@ -611,14 +903,14 @@ function decayGG(m, E, px, py, pz) {
 function buildTowers() {
   let n = 0, sumE = 0;
   const c = new THREE.Vector3(), a = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), col = new THREE.Color();
-  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]], w = 0.028;
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
   const B = twBuf;
   for (const sm of SMS) for (let iu = 0; iu < sm.nphi; iu++) for (let iv = 0; iv < sm.neta; iv++) {
     const id = sm.base + iu * sm.neta + iv, E = towE[id];
-    if (E < 0.1) continue;
+    if (E < 0.1 || n >= MAXFIRE) continue;
     sumE += E;
-    const ph = sm.phi0 + (iu + 0.5) * DPHI, et = sm.eta0 + (iv + 0.5) * sm.deta;
-    c.set(EMC_R * Math.cos(ph), EMC_R * Math.sin(ph), EMC_R * Math.sinh(et));
+    const ph = sm.phi0 + (iu + 0.5) * sm.dphi, et = sm.eta0 + (iv + 0.5) * sm.deta, Rf = sm.R, w = sm.w;
+    c.set(Rf * Math.cos(ph), Rf * Math.sin(ph), Rf * Math.sinh(et));
     a.copy(c).normalize();                                     // projective towards the nominal IP
     e1.set(-Math.sin(ph), Math.cos(ph), 0);
     e2.crossVectors(a, e1).normalize();
@@ -647,6 +939,257 @@ function buildTowers() {
   twGeo.setDrawRange(0, n * 30);
   for (const at of Object.values(twAttr)) at.needsUpdate = true;
   return { nTw: n, sumE };
+}
+
+/* ================= forward detectors, muon spectrometer, spectators → ZDC ================= */
+const W = { nv: 0, nh: 0, trks: [], maxPath: 0 };   // shared track/hit buffers, continued after the central tracks
+const _hm = new THREE.Matrix4(), _hq = new THREE.Quaternion(), _hs = new THREE.Vector3(), _hp = new THREE.Vector3();
+function addSeg(a, s0, b, s1) {
+  if (W.nv + 2 > MAXV) return false;
+  const o = W.nv * 3;
+  tPos[o] = a[0]; tPos[o + 1] = a[1]; tPos[o + 2] = a[2]; tPath[W.nv] = s0;
+  tPos[o + 3] = b[0]; tPos[o + 4] = b[1]; tPos[o + 5] = b[2]; tPath[W.nv + 1] = s1;
+  W.nv += 2; return true;
+}
+function addHit(x, y, z, t, sc, col) {
+  if (W.nh >= MAXH) return false;
+  _hp.set(x, y, z); _hs.setScalar(sc); _hm.compose(_hp, _hq, _hs); hits.setMatrixAt(W.nh, _hm);
+  hT.array[W.nh] = t;
+  if (col) { hC.array[W.nh * 3] = col.r; hC.array[W.nh * 3 + 1] = col.g; hC.array[W.nh * 3 + 2] = col.b; }
+  W.nh++; return true;
+}
+// dN/dη shape beyond the central plateau (after ALICE, PLB 772 (2017) 567: ≈ flat to |η| ≈ 2.5, then falling)
+const fShape = eta => { const a = Math.abs(eta); return a < 2.5 ? 1 : Math.exp(-((a - 2.5) ** 2) / 8); };
+function nInRange(dndeta, lo, hi) { let sum = 0; const n = 40; for (let i = 0; i < n; i++) sum += fShape(lo + (i + 0.5) * (hi - lo) / n); return dndeta * sum * (hi - lo) / n; }
+function sampleEta(lo, hi) { for (let k = 0; k < 200; k++) { const e = lo + (hi - lo) * rnd(); if (rnd() < fShape(e)) return e; } return lo; }
+function poisson(mu) {
+  if (mu > 40) return Math.max(0, Math.round(mu + Math.sqrt(mu) * gauss()));
+  const L = Math.exp(-mu); let k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1;
+}
+const FDD_COL = new THREE.Color('#ffd27a');
+
+// which forward detector (if any) a crossing at plane z = pz registers in
+function fwdHit(pz, x, y) {
+  const r = Math.hypot(x, y);
+  if (pz > -0.80 && pz < -0.44) return r > mftRin(pz) && r < mftRout(pz) ? { k: 'mft', sc: 0.0035, z: pz } : null;
+  if (pz === FT0C_ZP) { for (const [cx, cy] of FT0C_MOD) if (Math.abs(x - cx) < FT0_H && Math.abs(y - cy) < FT0_H) return { k: 'ft0', sc: 0.010, z: ft0cZ(x, y) }; return null; }
+  if (pz === FV0_Z) return r > FV0_Z / Math.sinh(5.0) && r < FV0_Z / Math.sinh(2.2) ? { k: 'fv0', sc: 0.014, z: pz } : null;
+  if (pz === FT0A_Z) { for (const [cx, cy] of FT0A_MOD) if (Math.abs(x - cx) < FT0_H && Math.abs(y - cy) < FT0_H) return { k: 'ft0', sc: 0.010, z: pz }; return null; }
+  return null;
+}
+const PLANES_C = [...MFT_PLANES, FT0C_ZP], PLANES_A = [FV0_Z, FT0A_Z];
+function sampleHadron() {
+  const u = rnd(), sp = u < SP[0].frac ? 0 : u < SP[0].frac + SP[1].frac ? 1 : 2;
+  let pt = rnd() < 0.97 ? -SP[sp].theta * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)) : 1.5 * Math.pow(rnd() + 1e-9, -1 / 4.5);
+  return { sp, q: rnd() < 0.5 ? 1 : -1, pt: Math.min(Math.max(pt, 0.05), 30) };
+}
+function flowPhi(v2, psi2, pt) {
+  const v2pt = Math.min(v2 * Math.min(pt / 0.7, 2.6), 0.3);
+  let phi; do { phi = rnd() * 2 * Math.PI; } while (rnd() * (1 + 2 * v2pt) > 1 + 2 * v2pt * Math.cos(2 * (phi - psi2)));
+  return phi;
+}
+
+// forward hadron: analytic helix in the solenoid to FIT-A (A side) or to the absorber face (C side);
+// C side: π/K may decay to μ before the absorber, otherwise the hadron showers inside it
+function fwdHadron(h, eta, phi, vz, side, cnt, out) {
+  const sp = SP[h.sp], sh = Math.sinh(eta), ch = Math.cosh(eta), Rh = h.pt / (0.3 * BFIELD);
+  const zEnd = side > 0 ? FT0A_Z + 0.03 : ABS_Z0;
+  let sT = (zEnd - vz) / sh, decayed = false;
+  if (side < 0 && sp.ctau) {
+    const sDec = h.pt * ch / sp.m * sp.ctau * -Math.log(rnd() + 1e-12);
+    if (sDec / ch < sT) { sT = sDec / ch; decayed = true; }
+  }
+  const tr = { pt: h.pt, q: h.q, sp: h.sp, start: W.nv, count: 0, h0: W.nh, nh: 0, gain: 0.16 };   // forward hadrons: dimmed (thousands overlap)
+  const N = 12, dsT = sT / N, planes = side > 0 ? PLANES_A : PLANES_C;
+  let x = 0, y = 0, z = vz, al = phi, s = 0;
+  for (let k = 0; k < N; k++) {
+    const da = -h.q * dsT / Rh, am = al + da / 2;
+    const nx = x + Math.cos(am) * dsT, ny = y + Math.sin(am) * dsT, nz = z + sh * dsT, ns = s + dsT * ch;
+    if (!addSeg([x, y, z], s, [nx, ny, nz], ns)) break;
+    for (const pz of planes) if ((z - pz) * (nz - pz) < 0) {
+      const f = (pz - z) / (nz - z), hx = x + f * (nx - x), hy = y + f * (ny - y), hit = fwdHit(pz, hx, hy);
+      if (hit && addHit(hx, hy, hit.z, s + f * (ns - s), hit.sc)) { tr.nh++; cnt[hit.k]++; }
+    }
+    x = nx; y = ny; z = nz; s = ns; al += da;
+  }
+  const d = [Math.cos(al) / ch, Math.sin(al) / ch, sh / ch];
+  if (side < 0 && !decayed) {                     // into the front absorber (or the beam shield)
+    const r = Math.hypot(x, y);
+    if (r < absR(ABS_Z0)) {
+      const lam = r < shieldR(ABS_Z0) ? MAT_W.lam : 0.43;
+      const depth = Math.min(-lam * Math.log(rnd() + 1e-12), (ABS_Z1 - z) / d[2]);
+      const e = [x + d[0] * depth, y + d[1] * depth, z + d[2] * depth];
+      if (addSeg([x, y, z], s, e, s + depth)) s += depth;
+    }
+  }
+  tr.count = W.nv - tr.start; out.push(tr);
+  if (decayed) {                                  // π/K → μν: μ roughly along the parent, softer
+    const p = h.pt * ch, f = h.sp === 0 ? 0.58 + 0.42 * rnd() : 0.05 + 0.95 * rnd();
+    const kick = (h.sp === 0 ? 0.03 : 0.24) / Math.max(p * f, 0.3);
+    const dm = [d[0] + kick * gauss(), d[1] + kick * gauss(), d[2]], n = Math.hypot(...dm);
+    fwdMuon([x, y, z], dm.map(v => v / n), p * f, h.q, s, 'decay', cnt, out);
+  }
+}
+
+// magnetic field: solenoid 0.5 T (Bz) inside L3, dipole 0.67 T (Bx) in the spectrometer
+function fieldAt(x, y, z) {
+  const r = Math.hypot(x, y);
+  const Bz = Math.abs(z) < 6.1 && r < 5.8 ? BFIELD : 0;
+  let Bx = 0;
+  if (z > DIP.z0 && z < DIP.z1 && Math.abs(x) < apH(z) && Math.abs(y) < apH(z)) {
+    const e = Math.min(z - DIP.z0, DIP.z1 - z);
+    Bx = DIP.B * (e > 0.8 ? 1 : 0.5 * (1 - Math.cos(Math.PI * e / 0.8)));
+  }
+  return [Bx, 0, Bz];
+}
+function muMaterial(x, y, z) {
+  const az = -z, r = Math.hypot(x, y);
+  if (az >= -ABS_Z0 && az < -ABS_Z1) {
+    if (r < shieldR(z)) return MAT_W;
+    if (r < absR(z)) for (const a of ABS_PARTS) if (az < a.a1) return a;
+    return null;
+  }
+  if (az >= -ABS_Z1 && r < shieldR(z)) return MAT_W;
+  if (z <= FILTER.z1 && z > FILTER.z0 && Math.max(Math.abs(x), Math.abs(y)) < mchH(FILTER.z0) + 0.15) return MAT_FE;
+  return null;
+}
+// muon transport: Lorentz force in the field map, mean dE/dx and multiple scattering in the absorbers
+function fwdMuon(x0, d0, p0, q, s0, tag, cnt, out) {
+  let x = x0.slice(), d = d0.slice(), p = p0, s = s0;
+  const tr = { pt: p0 * Math.hypot(d0[0], d0[1]), q, sp: 3, start: W.nv, count: 0, h0: W.nh, nh: 0, gain: 1.7, mu: true, tag, mch: 0, mid: 0, stop: '' };
+  for (let it = 0; it < 900; it++) {
+    const z = x[2], mat = muMaterial(x[0], x[1], z), B = fieldAt(x[0], x[1], z), Bm = Math.hypot(...B);
+    let ds = mat ? 0.06 : Math.abs(z) < 1.0 ? 0.03 : 0.15;
+    if (Bm > 0) ds = Math.min(ds, 0.04 * p / (0.3 * Bm));
+    const k = 0.3 * q / p;
+    let nd = [d[0] + k * (d[1] * B[2] - d[2] * B[1]) * ds, d[1] + k * (d[2] * B[0] - d[0] * B[2]) * ds, d[2] + k * (d[0] * B[1] - d[1] * B[0]) * ds];
+    if (mat) {
+      p -= mat.dEdx * ds;
+      if (p < 0.15) { tr.stop = 'ranged out'; break; }
+      const th0 = 0.0136 / p * Math.sqrt(ds / mat.X0);
+      const a = Math.abs(nd[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+      let u = [a[1] * nd[2] - a[2] * nd[1], a[2] * nd[0] - a[0] * nd[2], a[0] * nd[1] - a[1] * nd[0]]; const un = Math.hypot(...u); u = u.map(v => v / un);
+      const w = [nd[1] * u[2] - nd[2] * u[1], nd[2] * u[0] - nd[0] * u[2], nd[0] * u[1] - nd[1] * u[0]];
+      const g1 = th0 * gauss(), g2 = th0 * gauss();
+      nd = [nd[0] + g1 * u[0] + g2 * w[0], nd[1] + g1 * u[1] + g2 * w[1], nd[2] + g1 * u[2] + g2 * w[2]];
+    }
+    const nn = Math.hypot(...nd); nd = nd.map(v => v / nn);
+    const nx = [x[0] + nd[0] * ds, x[1] + nd[1] * ds, x[2] + nd[2] * ds], ns = s + ds;
+    if (!addSeg(x, s, nx, ns)) break;
+    const cross = pz => (x[2] - pz) * (nx[2] - pz) < 0;
+    const at = pz => { const f = (pz - x[2]) / (nx[2] - x[2]); return [x[0] + f * (nx[0] - x[0]), x[1] + f * (nx[1] - x[1]), s + f * ds]; };
+    if (z > -0.9) for (const pz of PLANES_C) if (cross(pz)) {
+      const [hx, hy, ht] = at(pz), hit = fwdHit(pz, hx, hy);
+      if (hit && addHit(hx, hy, hit.z, ht, hit.sc)) { tr.nh++; cnt[hit.k]++; }
+    }
+    for (const pz of MCH_Z) if (cross(pz)) {
+      const [hx, hy, ht] = at(pz);
+      if (Math.abs(hx) < mchH(pz) && Math.abs(hy) < mchH(pz) && Math.max(Math.abs(hx), Math.abs(hy)) > mchHole(pz) && addHit(hx, hy, pz, ht, 0.03)) { tr.nh++; tr.mch++; }
+    }
+    for (const pz of MID_Z) if (cross(pz)) {
+      const [hx, hy, ht] = at(pz);
+      if (Math.abs(hx) < midH(pz) && Math.abs(hy) < midH(pz) && Math.max(Math.abs(hx), Math.abs(hy)) > midHole(pz) && addHit(hx, hy, pz, ht, 0.05)) { tr.nh++; tr.mid++; }
+    }
+    x = nx; d = nd; s = ns;
+    const az = -x[2], r = Math.hypot(x[0], x[1]);
+    if (x[2] < MU_END) { tr.stop = 'end'; break; }
+    if (x[2] > 0.3 || (az < -ABS_Z0 && r > 0.45) || (az >= -ABS_Z0 && az < -ABS_Z1 && r > absR(x[2]) + 0.05)
+        || (az >= -ABS_Z1 && (Math.abs(x[0]) > mchH(x[2]) + 0.4 || Math.abs(x[1]) > mchH(x[2]) + 0.4))) { tr.stop = 'left acceptance'; break; }
+  }
+  tr.count = W.nv - tr.start; tr.pEnd = p; out.push(tr);
+  W.maxPath = Math.max(W.maxPath, s);
+  return tr;
+}
+
+function forward(dndeta, v2, psi2, vz, ncoll) {
+  const cnt = { mft: 0, ft0: 0, fv0: 0, fdd: 0 }, out = W.trks, muons = [];
+  // A side: 2.2 < η < 5.1 → FV0, FT0-A
+  const nA = poisson(nInRange(dndeta, 2.2, 5.1));
+  for (let k = 0; k < nA; k++) { const h = sampleHadron(); fwdHadron(h, sampleEta(2.2, 5.1), flowPhi(v2, psi2, h.pt), vz, 1, cnt, out); }
+  // C side: −4.3 < η < −2.0 → MFT, FT0-C, absorber; π/K decays feed the muon arm
+  const nC = poisson(nInRange(dndeta, 2.0, 4.3)), k0 = out.length;
+  for (let k = 0; k < nC; k++) { const h = sampleHadron(); fwdHadron(h, -sampleEta(2.0, 4.3), flowPhi(v2, psi2, h.pt), vz, -1, cnt, out); }
+  for (let i = k0; i < out.length; i++) if (out[i].mu) muons.push(out[i]);
+  // FDD: hits only (straight lines from the vertex), 4.7 < η < 6.3 and −6.9 < η < −4.9
+  for (const [F, lo, hi, sg] of [[FDD[0], 4.7, 6.3, 1], [FDD[1], 4.9, 6.9, -1]]) {
+    const n = poisson(nInRange(dndeta, lo, hi));
+    for (let k = 0; k < n; k++) {
+      const eta = sg * sampleEta(lo, hi), ph = rnd() * 2 * Math.PI, r = (F.z - vz) / Math.sinh(eta);
+      const hx = r * Math.cos(ph), hy = r * Math.sin(ph);
+      if (Math.abs(hx) < F.h && Math.abs(hy) < F.h && Math.max(Math.abs(hx), Math.abs(hy)) > F.hole) {
+        const L = Math.hypot(r, F.z - vz);
+        if (addHit(hx, hy, F.z, L, 0.03, FDD_COL)) { cnt.fdd++; W.maxPath = Math.max(W.maxPath, L); }
+      }
+    }
+  }
+  // heavy-flavour decay muons (toy: ≈ 1.5 × 10⁻³ per binary collision with p_T > 1 GeV/c in −4 < η < −2.5)
+  const nHF = poisson(0.0015 * ncoll);
+  for (let k = 0; k < nHF; k++) {
+    const eta = -(2.5 + 1.5 * rnd()), pt = Math.min(1.0 * Math.pow(rnd() + 1e-9, -1 / 3.0), 25), ph = rnd() * 2 * Math.PI;
+    const d = [Math.cos(ph) / Math.cosh(eta), Math.sin(ph) / Math.cosh(eta), Math.tanh(eta)];
+    muons.push(fwdMuon([0, 0, vz], d, pt * Math.cosh(eta), rnd() < 0.5 ? 1 : -1, 0, 'hf', cnt, out));
+  }
+  // J/ψ → μ⁺μ⁻ in −4 < y < −2.5 (one per event when enabled)
+  let jpsi = null;
+  if (jpsiOn) {
+    const M = 3.0969, y = -(2.5 + 1.5 * rnd()), pt = -1.2 * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)), ph = rnd() * 2 * Math.PI, mT = Math.hypot(M, pt);
+    const E = mT * Math.cosh(y), P = [pt * Math.cos(ph), pt * Math.sin(ph), mT * Math.sinh(y)];
+    const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), a = 2 * Math.PI * rnd(), q0 = Math.sqrt(M * M / 4 - 0.1057 ** 2);
+    const bx = P[0] / E, by = P[1] / E, bz = P[2] / E, b2 = bx * bx + by * by + bz * bz, g = E / M, e0 = M / 2;
+    const mus = [];
+    for (const sg of [1, -1]) {
+      const qx = sg * q0 * st * Math.cos(a), qy = sg * q0 * st * Math.sin(a), qz = sg * q0 * ct, bq = bx * qx + by * qy + bz * qz;
+      const kk = (g - 1) * bq / b2 + g * e0, pv = [qx + kk * bx, qy + kk * by, qz + kk * bz], pm = Math.hypot(...pv);
+      mus.push(fwdMuon([0, 0, vz], pv.map(v => v / pm), pm, sg, 0, 'jpsi', cnt, out));
+    }
+    muons.push(...mus);
+    const both = mus.every(m => m.mch >= 7);
+    jpsi = { y, pt, reco: both, m: both ? M + 0.07 * gauss() : null, trig: mus.every(m => m.mid >= 3) };
+  }
+  const nMuMCH = muons.filter(m => m.mch >= 7).length, nMuMID = muons.filter(m => m.mch >= 7 && m.mid >= 3).length;
+  return { nA, nC, ...cnt, nMuMCH, nMuMID, nMu: muons.length, jpsi };
+}
+
+/* spectator nucleons → ZDC: neutrons straight to ZN (0°), protons bent out by D1 into ZP (toy free-nucleon fraction) */
+const MAXSP = 2600;
+const spBuf = { position: new Float32Array(MAXSP * 3), pathT: new Float32Array(MAXSP), scol: new Float32Array(MAXSP * 3) };
+const spGeo = new THREE.BufferGeometry();
+const spAttr = {};
+for (const [k, a] of Object.entries(spBuf)) { spAttr[k] = new THREE.BufferAttribute(a, k === 'pathT' ? 1 : 3).setUsage(THREE.DynamicDrawUsage); spGeo.setAttribute(k, spAttr[k]); }
+spGeo.setDrawRange(0, 0);
+const spMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const head = exp(uSpec.sub(pT).max(0).mul(-0.15)).mul(1.5).add(1);
+  spMat.colorNode = attribute('scol', 'vec3').mul(mix(head.mul(0.07), float(0.7), uLight));   // ~30 lines overlap along the beam axis
+  spMat.opacityNode = step(pT, uSpec).mul(0.8);
+  themed.push(spMat);
+}
+const specLines = new THREE.LineSegments(spGeo, spMat); specLines.frustumCulled = false; scene.add(specLines);
+const N_COL = new THREE.Color('#cfe0ff'), P_COL = new THREE.Color('#ff8f6b');
+function spectators(nucleons, npart) {
+  let n = 0;
+  const c = { znA: 0, znC: 0, zpA: 0, zpC: 0 }, pFree = 0.3 + 0.5 * npart / 416;
+  const put = (a, b, col) => {
+    if (n + 2 > MAXSP) return;
+    spBuf.position.set([...a, ...b], n * 3); spBuf.pathT[n] = Math.abs(a[2]); spBuf.pathT[n + 1] = Math.abs(b[2]);
+    spBuf.scol.set([col.r, col.g, col.b, col.r, col.g, col.b], n * 3); n += 2;
+  };
+  for (const nu of nucleons) {
+    if (nu.part || rnd() > pFree) continue;
+    const sd = -nu.side, tag = sd > 0 ? 'A' : 'C', sx = 0.004 * gauss(), sy = 0.004 * gauss();
+    if (rnd() < 126 / 208) {
+      put([0, 0, 0], [sx, sy, sd * ZDC_Z], N_COL); c['zn' + tag]++;
+    } else {
+      const xz = sd * ZP.x + 0.6 * ZP.hx * (2 * rnd() - 1), th = xz / ((D1[1] - D1[0]) / 2 + (ZDC_Z - D1[1])), x1 = th * (D1[1] - D1[0]) / 2;
+      put([0, 0, 0], [0, 0, sd * D1[0]], P_COL); put([0, 0, sd * D1[0]], [x1, sy * 0.5, sd * D1[1]], P_COL); put([x1, sy * 0.5, sd * D1[1]], [xz, sy, sd * ZDC_Z], P_COL);
+      c['zp' + tag]++;
+    }
+  }
+  spGeo.setDrawRange(0, n);
+  for (const a of Object.values(spAttr)) a.needsUpdate = true;
+  for (const k of Object.keys(zdcU)) zdcU[k].value = c[k] > 0 ? 1 : 0;
+  return c;
 }
 
 function generate(centPct) {
@@ -685,7 +1228,7 @@ function generate(centPct) {
 
   const dndeta = npart >= 2 ? 5.1 * (0.88 * npart / 2 + 0.12 * ncoll) : 0;
   const nch09 = Math.max(0, Math.round(1.8 * dndeta * (1 + 0.04 * gauss())));
-  const nGen = Math.min(Math.round(nch09 * 2.0 / 1.8), MAXTRK);
+  const nGen = Math.min(Math.round(nch09 * 2.0 / 1.8), 4600);
 
   // tracks
   const trks = [];
@@ -693,6 +1236,7 @@ function generate(centPct) {
   const hitM = new THREE.Matrix4(), hq = new THREE.Quaternion(), hs = new THREE.Vector3(), hp = new THREE.Vector3();
   const vz = 0.03 * gauss();
   towE.fill(0); towT.fill(0);
+  let nHmpid = 0;
   for (let k = 0; k < nGen; k++) {
     let u = rnd(), sp = u < SP[0].frac ? 0 : u < SP[0].frac + SP[1].frac ? 1 : 2;
     const q = rnd() < 0.5 ? 1 : -1;
@@ -703,7 +1247,7 @@ function generate(centPct) {
     let phi; do { phi = rnd() * 2 * Math.PI; } while (rnd() * (1 + 2 * v2pt) > 1 + 2 * v2pt * Math.cos(2 * (phi - psi2)));
 
     const R = pt / (0.3 * BFIELD), sh = Math.sinh(eta), ch = Math.cosh(eta);
-    const tr = { pt, q, sp, start: nv, count: 0, h0: nh, nh: 0 };
+    const tr = { pt, q, sp, start: nv, count: 0, h0: nh, nh: 0, gain: 1 };
     let x = 0, y = 0, z = vz, alpha = phi, s3 = 0, turned = 0, seg = 0, nvTOF = 0, sTOF = 0;
     while (seg < MAXSEG && nv + 2 <= MAXV) {
       const r = Math.hypot(x, y);
@@ -731,14 +1275,22 @@ function generate(centPct) {
         }
       }
       x = nx; y = ny; z = nz; s3 = ns; alpha += da; turned += Math.abs(da);
-      if ((rn < TPC_ROUT && Math.abs(z) > TPC_HL) || Math.abs(z) > TOF_HL || rn >= EMC_R || turned > 2.6 * Math.PI) break;
+      if ((rn < TPC_ROUT && Math.abs(z) > TPC_HL) || Math.abs(z) > TOF_HL || turned > 2.6 * Math.PI) break;
+      if (rn > TOF_R + 0.04 && rn >= outerTarget(nx, ny, nz)) break;
     }
-    // continue to the calorimeter only if the track lands in EMCal/DCal acceptance; otherwise stop at TOF
+    // continue past TOF only into an outer detector: HMPID (hit), PHOS or EMCal/DCal (deposit); otherwise stop at TOF
     const rEnd = Math.hypot(x, y);
-    if (rEnd >= EMC_R) {
-      const p = pt * ch, mip = rnd() < 0.62;
-      const Edep = mip ? 0.27 * (1 + 0.12 * gauss()) : p * (0.15 + 0.5 * rnd());
-      if (!deposit(Math.asinh(z / rEnd), normPhi(Math.atan2(y, x)), Edep, s3, mip ? 0.15 : 0.7, mip ? 3 : 14) && nvTOF) { nv = nvTOF; s3 = sTOF; }
+    if (rEnd > TOF_R + 0.06) {
+      let ok = false;
+      if (rEnd >= HMPID_R - 0.02 && hmpidAt(x, y, z) && nh < MAXH) {
+        hp.set(x, y, z); hs.setScalar(0.035); hitM.compose(hp, hq, hs); hits.setMatrixAt(nh, hitM);
+        hT.array[nh] = s3; nh++; tr.nh++; nHmpid++; ok = true;
+      } else if (rEnd >= EMC_R - 0.01) {
+        const p = pt * ch, mip = rnd() < 0.62;
+        const Edep = mip ? 0.27 * (1 + 0.12 * gauss()) : p * (0.15 + 0.5 * rnd());
+        ok = deposit(Math.asinh(z / rEnd), normPhi(Math.atan2(y, x)), Edep, s3, mip ? 0.15 : 0.7, mip ? 3 : 14, rEnd >= PHOS_R - 0.01 ? PHOS_R : EMC_R);
+      }
+      if (!ok && nvTOF) { nv = nvTOF; s3 = sTOF; }
     }
     tr.count = nv - tr.start;
     maxPath = Math.max(maxPath, s3);
@@ -757,10 +1309,14 @@ function generate(centPct) {
     const mT = Math.hypot(M.m, pt);
     for (const [E, px, py, pz] of decayGG(M.m, mT * Math.cosh(y), pt * Math.cos(phi), pt * Math.sin(phi), mT * Math.sinh(y))) {
       const pTg = Math.hypot(px, py); if (pTg < 1e-6 || ng >= MAXG) continue;
-      const zI = vz + EMC_R * pz / pTg, L = Math.hypot(EMC_R, zI - vz);
-      if (!deposit(Math.asinh(zI / EMC_R), normPhi(Math.atan2(py, px)), Math.max(emcSmear(E), 0), L, 0.3, 12)) continue;
+      const phiG = normPhi(Math.atan2(py, px));
+      let Rc = EMC_R, zI = vz + Rc * pz / pTg, h = towerAt(Math.asinh(zI / Rc), phiG, Rc);
+      if (!h && phosOn) { Rc = PHOS_R; zI = vz + Rc * pz / pTg; h = towerAt(Math.asinh(zI / Rc), phiG, Rc); }
+      if (!h) continue;
+      const L = Math.hypot(Rc, zI - vz);
+      depositAt(h, Math.max(h.sm.phos ? phosSmear(E) : emcSmear(E), 0), L, 0.3, 12);
       const o = ng * 6;
-      G.position.set([0, 0, vz, EMC_R * px / pTg, EMC_R * py / pTg, zI], o);
+      G.position.set([0, 0, vz, Rc * px / pTg, Rc * py / pTg, zI], o);
       G.pathT[ng * 2] = 0; G.pathT[ng * 2 + 1] = L;
       G.gE[ng * 2] = G.gE[ng * 2 + 1] = Math.min(0.25 + 0.3 * E, 2.2);
       maxPath = Math.max(maxPath, L);
@@ -769,21 +1325,26 @@ function generate(centPct) {
   }
   gGeo.setDrawRange(0, ng * 2);
   for (const a of Object.values(gAttr)) a.needsUpdate = true;
+  // forward detectors, muon arm (shared buffers continue after the central tracks)
+  W.nv = nv; W.nh = nh; W.trks = trks; W.maxPath = Math.min(maxPath, 6.5);
+  const fw = forward(dndeta, v2, psi2, vz, ncoll);
   const cal = buildTowers();
+  const spec = spectators(nucleons, npart);
 
-  ev = { b, c: c * 100, npart, ncoll, eps2, psi2, v2, nch09, nGen, nucleons, su, sv, mx, my, trks, nv, nh, ng, ...cal, maxPath: Math.min(maxPath, 6.5) };
-  trkGeo.setDrawRange(0, nv);
-  hits.count = nh;
+  ev = { b, c: c * 100, npart, ncoll, eps2, psi2, v2, nch09, nGen, nucleons, su, sv, mx, my, trks, nv: W.nv, nh: W.nh, ng, nHmpid, ...cal, ...fw, ...spec, maxPath: Math.min(W.maxPath, 20) };
+  trkGeo.setDrawRange(0, W.nv);
+  hits.count = W.nh;
   recolor();
   aPos.needsUpdate = true; aPath.needsUpdate = true;
   hT.needsUpdate = true; hits.instanceMatrix.needsUpdate = true;
   evNo++;
 }
 
+const tmpC2 = new THREE.Color();
 function recolor() {
   if (!ev) return;
   for (const tr of ev.trks) {
-    const c = trackColor(tr, colorMode);
+    const c = tmpC2.copy(trackColor(tr, colorMode)).multiplyScalar(tr.gain ?? 1);
     for (let i = tr.start; i < tr.start + tr.count; i++) { tCol[i * 3] = c.r; tCol[i * 3 + 1] = c.g; tCol[i * 3 + 2] = c.b; }
     for (let i = tr.h0; i < tr.h0 + tr.nh; i++) { hC.array[i * 3] = c.r; hC.array[i * 3 + 1] = c.g; hC.array[i * 3 + 2] = c.b; }
   }
@@ -799,14 +1360,14 @@ const cLead = new THREE.Color(0x9fb2cf), cPart = new THREE.Color(0xffb24a), cFla
 function updateNuclei(t) {
   const rN = 0.85 * S;
   ev.nucleons.forEach((n, i) => {
-    const zc = -n.side * V_NUC * t;              // A (side +1) comes from +z, B from −z
+    const zc = -n.side * specZ(t);               // A (side +1) comes from +z, B from −z
     const zl = n.p[2] * S / GAMMA_VIS;
     let sc = rN, col = cLead;
     if (n.part) {
       if (t > 0.12) sc = 0;
       else if (t >= 0) { col = cFlash; sc = rN * 1.3; }
       else if (t > -0.45) col = tmpC.copy(cLead).lerp(cPart, Math.min(1, (t + 0.45) / 0.3));
-    } else if (Math.abs(zc) > 9) sc = 0;
+    } else if (Math.abs(zc) > ZDC_Z) sc = 0;
     dummy.position.set(n.p[0] * S, n.p[1] * S, zc + zl);
     dummy.scale.set(sc, sc, sc / GAMMA_VIS * 3);
     dummy.updateMatrix();
@@ -836,8 +1397,10 @@ const PHASES = [
   [0.08, 'Impact', () => `b = ${ev.b.toFixed(1)} fm · N_part = ${ev.npart}, N_coll = ${ev.ncoll}. Spectators continue towards the ZDCs at ±112.5 m.`],
   [0.32, 'QGP formation', () => `τ₀ ≲ 1 fm/c, T₀ ≳ 300 MeV. Initial overlap eccentricity ε₂ = ${ev.eps2.toFixed(2)}.`],
   [T0 + 0.15, 'Expansion & freeze-out', () => `Pressure gradients convert ε₂ into momentum anisotropy v₂ ≈ ${ev.v2.toFixed(3)}; chemical freeze-out at T_ch ≈ 156 MeV.`],
-  [T0 + 4.0 / V_TRK, 'Tracking', () => `Charged particles curl in B = 0.5 T: R[m] = p_T[GeV/c] / (0.3·B[T]). Hits on 7 ITS2 layers and TOF; ${ev.nGen.toLocaleString()} tracks drawn for |η| < 1.`],
-  [1e9, 'Calorimetry', () => `${ev.nTw.toLocaleString()} EMCal/DCal towers above 100 MeV, ΣE = ${ev.sumE.toFixed(0)} GeV. Dashed lines: ${ev.ng} photons from π⁰, η → γγ in acceptance. Charged hadrons leave MIP or partial hadronic showers.`],
+  [T0 + revealTime(4.2), 'Tracking', () => `Charged particles curl in B = 0.5 T: R[m] = p_T[GeV/c] / (0.3·B[T]). ITS2 + TOF hits for ${ev.nGen.toLocaleString()} tracks at |η| < 1; forward hadrons (dimmed) leave ${ev.mft.toLocaleString()} MFT and ${(ev.ft0 + ev.fv0).toLocaleString()} FT0/FV0 hits.`],
+  [T0 + revealTime(5.6), 'Calorimetry', () => `${ev.nTw.toLocaleString()} ${phosOn ? 'EMCal/DCal/PHOS cells' : 'EMCal/DCal towers'} above 100 MeV, ΣE = ${ev.sumE.toFixed(0)} GeV. Dashed lines: ${ev.ng} photons from π⁰, η → γγ in acceptance. Charged hadrons leave MIP or partial hadronic showers${ev.nHmpid ? `; ${ev.nHmpid} tracks reach HMPID` : ''}.`],
+  [T_ZDC + 0.6, 'Spectators → ZDC', () => `Free spectator nucleons reach the ZDCs at ±112.5 m: ZN-A ${ev.znA} n, ZN-C ${ev.znC} n (E ≈ ${(ev.znA * E_BEAM_N).toFixed(0)} / ${(ev.znC * E_BEAM_N).toFixed(0)} TeV); protons are bent out by D1 into ZP-A ${ev.zpA}, ZP-C ${ev.zpC}. Use the ZDC-A or Far view.`],
+  [1e9, 'Muon arm', () => `The front absorber stops the hadrons; ${ev.nMuMCH} of ${ev.nMu} muons cross the MCH and ${ev.nMuMID} pass the iron filter to MID. The 0.67 T dipole bends them vertically (Muon arm view).${ev.jpsi ? (ev.jpsi.reco ? ` J/ψ → μ⁺μ⁻ at y = ${ev.jpsi.y.toFixed(2)}: m_μμ = ${ev.jpsi.m.toFixed(3)} GeV/c².` : ` J/ψ at y = ${ev.jpsi.y.toFixed(2)}: a daughter muon left the acceptance.`) : ''} FDD: ${ev.fdd} hits.`],
 ];
 let lastPhase = -1;
 function phaseUpdate(t) {
@@ -858,6 +1421,13 @@ function stats() {
   $('sTw').textContent = ev.nTw.toLocaleString();
   $('sSE').textContent = ev.sumE.toFixed(0);
   $('sNg').textContent = ev.ng.toLocaleString();
+  $('sMft').textContent = ev.mft.toLocaleString();
+  $('sFit').textContent = (ev.ft0 + ev.fv0).toLocaleString();
+  $('sFdd').textContent = ev.fdd.toLocaleString();
+  $('sMu').textContent = `${ev.nMuMCH} / ${ev.nMuMID}`;
+  $('sMmm').textContent = ev.jpsi?.reco ? ev.jpsi.m.toFixed(3) : '—';
+  $('sZn').textContent = `${ev.znA} / ${ev.znC}`;
+  $('sZp').textContent = `${ev.zpA} / ${ev.zpC}`;
 }
 
 function newEvent() {
@@ -884,25 +1454,47 @@ function legend() {
   el.insertAdjacentHTML('beforeend', `<h2 class="sub">EMCal / DCal tower E (GeV)</h2>
     <div class="ramp" style="background:linear-gradient(90deg,${E_COLS.map(c => '#' + c.getHexString(THREE.SRGBColorSpace)).join(',')})"></div>
     <div class="ticks">${[0.1, 1, 10, 20].map(v => `<span style="left:${lg(v)}%">${v}</span>`).join('')}</div>
-    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key muted">height 10 cm/GeV</span></div>`);
+    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key muted">height 10 cm/GeV</span></div>
+    <h2 class="sub">Forward &amp; far forward</h2>
+    <div class="keys"><span class="key"><i style="background:#6dffb2"></i>μ (bright)</span><span class="key muted">forward hadrons dimmed</span>
+    <span class="key"><i style="background:#cfe0ff"></i>n → ZN</span><span class="key"><i style="background:#ff8f6b"></i>p → ZP</span></div>`);
 }
 
 /* ---------------- labels ---------------- */
+// kind: 'ip' = shown in the detector-scale views, 'far' = shown in the Far view, 'zdc' = near the ZDC or in the Far view
 const LABELS = [
-  ['ITS2', 'inner tracker', [0, 0.42, 0.75]],
-  ['TPC', 'r 0.85–2.5 m', [0, TPC_ROUT, -TPC_HL]],
-  ['TRD', '', [0, -2.95, 3.5]],
-  ['TOF', 'r 3.7 m', [TOF_R, 0, TOF_HL]],
-  ['L3 magnet', '0.5 T', [0, 5.95, 6.1]],
-  ['EMCal', '80°–187°', [4.75 * Math.cos(133 * D2R), 4.75 * Math.sin(133 * D2R), 0.9]],
-  ['DCal', '260°–327°', [4.75 * Math.cos(293 * D2R), 4.75 * Math.sin(293 * D2R), 0.9]],
-  ['A side', '', [0, 0, 8.5]],
-  ['C side', 'muon arm', [0, 0, -8.5]],
-].map(([n, sub, p]) => {
+  ['ITS2', 'inner tracker', [0, 0.42, 0.75], 'ip'],
+  ['TPC', 'r 0.85–2.5 m', [0, TPC_ROUT, -TPC_HL], 'ip'],
+  ['TRD', '', [0, -2.95, 3.5], 'ip'],
+  ['TOF', 'r 3.7 m', [TOF_R, 0, TOF_HL], 'ip'],
+  ['L3 magnet', '0.5 T', [0, 5.95, 6.1], 'ip'],
+  ['EMCal', '80°–187°', [4.75 * Math.cos(133 * D2R), 4.75 * Math.sin(133 * D2R), 0.9], 'ip'],
+  ['DCal', '260°–327°', [4.75 * Math.cos(293 * D2R), 4.75 * Math.sin(293 * D2R), 0.9], 'ip'],
+  ['PHOS', 'PbWO₄', [4.95 * Math.cos(285 * D2R), 4.95 * Math.sin(285 * D2R), 0], 'phos'],
+  ['HMPID', 'RICH', [5.25 * Math.cos(30 * D2R), 5.25 * Math.sin(30 * D2R), 1.5], 'ip'],
+  ['MFT', '', [0, 0.17, -0.62], 'ip'],
+  ['FT0-C', '', [0.2, -0.2, -0.84], 'ip'],
+  ['FV0 · FT0-A', '', [0, 0.78, 3.27], 'ip'],
+  ['FDD-A', '', [0, 0.2, FDD[0].z], 'ip'],
+  ['FDD-C', '', [0, 0.2, FDD[1].z], 'ip'],
+  ['ZEM', '', [0, 0.1, ZEM_Z], 'ip'],
+  ['Front absorber', '', [0, absR(-3) + 0.1, -3.0], 'ip'],
+  ['Dipole', '0.67 T · 3 T·m', [0, 4.4, (DIP.z0 + DIP.z1) / 2], 'ip'],
+  ['MCH', '5 stations', [mchH(-12.8) + 0.1, 0, -12.8], 'ip'],
+  ['Muon filter', 'Fe 1.2 m', [0, mchH(-15.2) + 0.25, -15.2], 'ip'],
+  ['MID', 'RPC', [0, -midH(-16.7) - 0.1, -16.7], 'ip'],
+  ['ALICE', '', [0, 8, 0], 'far'],
+  ['Q1–Q3', 'triplet', [0, 0.4, 38], 'far'],
+  ['D1', '', [0, 0.4, 64.3], 'far'],
+  ['Q1–Q3', 'triplet', [0, 0.4, -38], 'far'],
+  ['D1', '', [0, 0.4, -64.3], 'far'],
+  ['ZN-A · ZP-A', '+112.5 m', [0, 0.12, ZDC_Z], 'zdc'],
+  ['ZN-C · ZP-C', '−112.5 m', [0, 0.12, -ZDC_Z], 'zdc'],
+].map(([n, sub, p, kind]) => {
   const d = document.createElement('div'); d.className = 'lbl';
   d.innerHTML = `<b>${n}</b>${sub ? ' · ' + sub : ''}`;
   $('labels').appendChild(d);
-  return { d, v: new THREE.Vector3(...p) };
+  return { d, v: new THREE.Vector3(...p), kind };
 });
 const PB = [1, -1].map(side => {
   const d = document.createElement('div'); d.className = 'lbl pb';
@@ -913,9 +1505,16 @@ const PB = [1, -1].map(side => {
 const pv = new THREE.Vector3();
 function placeLabels() {
   const w = innerWidth, h = innerHeight;
-  for (const L of PB) L.v.set(0, 0.04 + 7 * S, -L.side * V_NUC * simT);
+  for (const L of PB) L.v.set(0, 0.04 + 7 * S, -L.side * specZ(Math.min(simT, 0)));
+  const dCam = camera.position.distanceTo(controls.target), farView = dCam > 60;
   for (const L of [...LABELS, ...PB]) {
     if (L.side && simT > 0) { L.d.hidden = true; continue; }
+    const want = L.side ? !farView
+      : L.kind === 'ip' ? !farView
+      : L.kind === 'phos' ? !farView && phosOn
+      : L.kind === 'far' ? farView
+      : farView || camera.position.distanceTo(L.v) < 30;
+    if (!want) { L.d.hidden = true; continue; }
     pv.copy(L.v).project(camera);
     const vis = pv.z < 1 && Math.abs(pv.x) < 1.05 && Math.abs(pv.y) < 1.05;
     L.d.hidden = !vis;
@@ -926,14 +1525,22 @@ function placeLabels() {
 /* ---------------- camera presets ---------------- */
 // CAMERA DISTANCE: VIEW_ZOOM scales all three preset views (bigger = further out). 1.0 = previous version.
 const VIEW_ZOOM = 1.2;
-const VIEWS = { v3d: [8.4, 5.0, 10.4], vBeam: [0.001, 0.001, 15.5], vSide: [15.5, 0.8, 0.001] };
+// p = camera position, t = orbit target; k = true: scaled by VIEW_ZOOM
+const VIEWS = {
+  v3d:   { p: [8.4, 5.0, 10.4], t: [0, 0, 0], k: true },
+  vBeam: { p: [0.001, 0.001, 15.5], t: [0, 0, 0], k: true },
+  vSide: { p: [15.5, 0.8, 0.001], t: [0, 0, 0], k: true },
+  vMuon: { p: [21, 5.5, -2.5], t: [0, 0, -9.5], k: false },     // dipole bends in y: seen from the side
+  vZdc:  { p: [1.7, 0.9, 109.6], t: [0, 0, 113.0], k: false },
+  vFar:  { p: [175, 70, 0], t: [0, 0, 0], k: false },
+};
 let tween = null;
 function setView(id, instant) {
-  const k = (innerWidth / innerHeight < 1 ? 1.55 : 1) * VIEW_ZOOM;
-  const to = new THREE.Vector3(...VIEWS[id]).multiplyScalar(k);
-  for (const b of ['v3d', 'vBeam', 'vSide']) $(b).setAttribute('aria-pressed', b === id);
-  if (instant) { camera.position.copy(to); controls.target.set(0, 0, 0); return; }
-  tween = { from: camera.position.clone(), to, t: 0, tf: controls.target.clone() };
+  const V = VIEWS[id], k = (innerWidth / innerHeight < 1 ? 1.55 : 1) * (V.k ? VIEW_ZOOM : 1);
+  const tt = new THREE.Vector3(...V.t), to = new THREE.Vector3(...V.p).sub(tt).multiplyScalar(k).add(tt);
+  for (const b of Object.keys(VIEWS)) $(b).setAttribute('aria-pressed', b === id);
+  if (instant) { camera.position.copy(to); controls.target.copy(tt); return; }
+  tween = { from: camera.position.clone(), to, t: 0, tf: controls.target.clone(), tt };
 }
 
 /* ---------------- UI wiring ---------------- */
@@ -985,7 +1592,9 @@ function setZoom(lg) {
 $('iZoom').max = Math.log10(MAG0).toFixed(2);
 $('iZoom').oninput = e => setZoom(+e.target.value);
 setZoom(+$('iZoom').value);
-for (const id of ['v3d', 'vBeam', 'vSide']) $(id).onclick = () => setView(id);
+for (const id of Object.keys(VIEWS)) $(id).onclick = () => setView(id);
+$('cPhos').onchange = e => { phosOn = e.target.checked; phosGroup.visible = phosOn; newEvent(); };
+$('cJpsi').onchange = e => { jpsiOn = e.target.checked; newEvent(); };
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.code === 'Space') { e.preventDefault(); $('bPause').click(); }
@@ -1006,17 +1615,25 @@ renderer.setAnimationLoop(() => {
   if (!paused) simT += dt * speed;
   updateNuclei(simT);
   updateFire(simT);
-  uT.value = Math.max(0, simT - T0) * V_TRK;
+  uT.value = reveal(simT - T0);
+  uSpec.value = simT > 0 ? Math.min(specZ(simT), 400) : 0;
   phaseUpdate(simT);
-  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();
+  if (autoLoop && !paused && simT > Math.max(T0 + revealTime(ev.maxPath), T_ZDC) + 2.6) newEvent();
   if (tween) {
     tween.t = Math.min(1, tween.t + dt / 0.9);
     const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
     camera.position.lerpVectors(tween.from, tween.to, e);
-    controls.target.lerpVectors(tween.tf, new THREE.Vector3(), e);
+    controls.target.lerpVectors(tween.tf, tween.tt, e);
     if (tween.t >= 1) tween = null;
   }
   controls.update();
+  // clip planes and fog follow the orbit distance (from the 3 m ZDC close-up to the 230 m far view)
+  {
+    const d = camera.position.distanceTo(controls.target);
+    const nr = Math.max(0.004, d * 0.0006), fr = Math.max(200, d * 6);
+    if (Math.abs(camera.near - nr) > nr * 0.2 || Math.abs(camera.far - fr) > fr * 0.2) { camera.near = nr; camera.far = fr; camera.updateProjectionMatrix(); }
+    scene.fog.near = d * 1.35; scene.fog.far = d * 2.6;
+  }
   if (!$('labels').hidden) placeLabels();
   if (post && !lightTheme) post.render(); else renderer.render(scene, camera);
   if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
@@ -1045,7 +1662,7 @@ function composeShot(done) {
   g.fillStyle = css.getPropertyValue('--ink').trim(); g.textBaseline = 'bottom';
   g.fillText('ALICE · Pb–Pb √sNN = 5.36 TeV · toy MC', pad, c.height - pad - 18 * k);
   g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = css.getPropertyValue('--muted').trim();
-  g.fillText(`Event #${String(evNo).padStart(3, '0')} · centrality ${ev.c.toFixed(1)}% · b = ${ev.b.toFixed(2)} fm · Npart ${ev.npart} · ${ev.nTw} towers, ΣE ${ev.sumE.toFixed(0)} GeV`, pad, c.height - pad);
+  g.fillText(`Event #${String(evNo).padStart(3, '0')} · centrality ${ev.c.toFixed(1)}% · b = ${ev.b.toFixed(2)} fm · Npart ${ev.npart} · ${ev.nTw} towers, ΣE ${ev.sumE.toFixed(0)} GeV · μ (MCH/MID) ${ev.nMuMCH}/${ev.nMuMID} · ZN-A/C ${ev.znA}/${ev.znC}`, pad, c.height - pad);
   c.toBlob(done, 'image/png');
 }
 $('bShot').onclick = () => {
