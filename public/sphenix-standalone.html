@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>sPHENIX Event Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGPU event display; glass HUD top-left, legend top-right, control rail at the bottom. Deliberately single dark theme (event-display convention). */
+:root{
+  color-scheme: dark;
+  --void:#060a13;
+  --panel:rgba(9,15,28,.74);
+  --ink:#dfe6f3;
+  --muted:#8796b1;
+  --line:rgba(140,165,205,.20);
+  --amber:#ffb24a;
+  --steel:#6f8db8;
+  --btn:rgba(120,150,200,.10);
+  --on-accent:#1a1205;
+  --gamma:#fff0b8;
+  --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+/* Light theme: toggled by the page's own button (class on <html>), independent of the host theme */
+html.light{
+  color-scheme: light;
+  --void:#eef1f6;
+  --panel:rgba(252,253,255,.84);
+  --ink:#172033;
+  --muted:#56637c;
+  --line:rgba(40,60,100,.20);
+  --amber:#b86400;
+  --steel:#41618f;
+  --btn:rgba(40,70,120,.07);
+  --on-accent:#ffffff;
+  --gamma:#9a6a00;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:12px}
+#app{position:fixed;inset:0}
+#app canvas{display:block;width:100%;height:100%;touch-action:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.lbl b{color:var(--ink);font-weight:500}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#hud{top:calc(16px + env(safe-area-inset-top,0px));left:16px;width:min(330px,calc(100% - 32px));padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.eyebrow{font:500 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--amber)}
+h1{margin:0;font:600 30px/1 var(--display);letter-spacing:.01em;text-wrap:balance}
+#hudToggle{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;border-radius:3px}
+#hudToggle:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.chev{font-size:16px;color:var(--muted);transition:transform .2s}
+#hud.collapsed .chev{transform:rotate(-90deg)}
+.hud-body{display:flex;flex-direction:column;gap:10px}
+#hud.collapsed .hud-body,#hud.collapsed details{display:none}
+.beam{color:var(--muted);font-size:11px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;margin:0}
+.stats div{min-width:0}
+.stats dt{font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.stats dd{margin:2px 0 0;font:600 19px/1.1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.phase{border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:3px}
+#phaseName{font:600 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+#phaseNote{color:var(--muted);font-size:11px;line-height:1.45}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;color:var(--muted);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+summary:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+details p,details li{color:var(--muted);font-size:10.5px;line-height:1.5;margin:6px 0 0}
+details ul{margin:4px 0 0;padding-left:16px}
+details i{color:var(--ink);font-style:normal}
+#legend{top:calc(16px + env(safe-area-inset-top,0px));right:16px;padding:10px 12px;width:210px}
+#legend h2{margin:0 0 8px;font:500 10.5px/1.2 var(--mono);letter-spacing:.03em;color:var(--muted)}
+.ramp{height:8px;border-radius:2px}
+.ticks{position:relative;height:14px;margin-top:4px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.ticks span:first-child{transform:none}
+.ticks span:last-child{transform:translateX(-100%)}
+.keys{display:flex;flex-wrap:wrap;gap:6px 12px}
+.key{display:flex;align-items:center;gap:6px}
+.key i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.key i.dash{background:repeating-linear-gradient(90deg,var(--gamma) 0 3px,transparent 3px 6px)}
+.key.muted{color:var(--muted)}
+#legend h2.sub{margin-top:12px}
+#legend .keys{margin-top:6px}
+details a{color:var(--ink)}
+.lbl.pb{color:var(--amber);border-bottom-color:var(--amber)}
+.zoom output{min-width:19ch}
+#controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#controls.collapsed{right:auto;max-width:calc(100% - 32px)}
+.ctl-bar,.ctl-body{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.ctl-bar{gap:6px 8px}
+.ctl-bar label.chk{margin-left:6px}
+#controls.collapsed .ctl-body{display:none}
+#ctlToggle .chev{font-size:12px;margin-left:4px;display:inline-block;transition:transform .2s}
+#controls.collapsed #ctlToggle .chev{transform:rotate(180deg)}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grp>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--steel)}
+button.primary{background:var(--amber);color:var(--on-accent);border-color:var(--amber);font-weight:600}
+button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+input[type=range]{accent-color:var(--amber);width:120px}
+output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
+label.chk{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--ink)}
+input[type=checkbox]{accent-color:var(--amber)}
+#fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-inline:16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+@media (max-width:720px){
+  #legend{display:none}
+  #hud{padding:10px 12px;gap:7px}
+  h1{font-size:22px}
+  .stats dd{font-size:16px}
+  .hide-sm{display:none}
+  #controls,.ctl-body{gap:8px 12px}
+  input[type=range]{width:96px}
+}
+@media (max-height:620px){ details{display:none} }
+</style>
+<style>
+#controls select{max-width:100%}
+.key i.cone{background:rgba(255,178,74,.55);height:8px;border-radius:1px}
+</style>
+
+<div id="app">
+  <div id="labels"></div>
+
+  <section class="panel collapsed" id="hud" aria-label="Event summary">
+    <div class="eyebrow" id="eyebrow">RHIC · sPHENIX · toy MC</div>
+    <h1><button id="hudToggle" type="button" aria-expanded="false" aria-controls="hudBody">sPHENIX Event Display<span class="chev" aria-hidden="true">▾</span></button></h1>
+    <div id="hudBody" class="hud-body">
+    <div class="beam" id="beamLine">—</div>
+    <dl class="stats">
+      <div><dt>Event</dt><dd id="sEv">—</dd></div>
+      <div><dt>Centrality</dt><dd id="sCent">—</dd></div>
+      <div><dt>b (fm)</dt><dd id="sB">—</dd></div>
+      <div><dt>N<sub>part</sub></dt><dd id="sNp">—</dd></div>
+      <div><dt>N<sub>coll</sub></dt><dd id="sNc">—</dd></div>
+      <div><dt>N<sub>ch</sub> in TPC</dt><dd id="sNch">—</dd></div>
+      <div class="hide-sm"><dt>ε₂</dt><dd id="sEps">—</dd></div>
+      <div class="hide-sm"><dt>v₂ (input)</dt><dd id="sV2">—</dd></div>
+      <div><dt id="sProbeT">Probe</dt><dd id="sProbe">—</dd></div>
+      <div><dt>ΣE EMCal</dt><dd id="sSE">—</dd></div>
+      <div><dt>ΣE HCal</dt><dd id="sSH">—</dd></div>
+      <div class="hide-sm"><dt>Towers shown</dt><dd id="sTw">—</dd></div>
+      <div class="hide-sm"><dt>MVTX / INTT hits</dt><dd id="sSi">—</dd></div>
+      <div class="hide-sm"><dt>MBD / sEPD hits</dt><dd id="sHits">—</dd></div>
+      <div class="hide-sm"><dt>TPOT hits</dt><dd id="sTpot">—</dd></div>
+    </dl>
+    </div>
+    <div class="phase" aria-live="polite">
+      <span id="phaseName">Loading</span>
+      <span id="phaseNote">Initialising the renderer…</span>
+    </div>
+    <details>
+      <summary>Model &amp; references</summary>
+      <ul>
+        <li><i>Detector</i> (as operated in Runs 23–25, sPHENIX frame: +z = North, +y = up). Former BaBar superconducting solenoid, 1.4 T, cryostat r ≈ 1.40–1.73 m, length ≈ 3.85 m. MVTX (MAPS, Monolithic Active Pixel Sensors; ALICE ITS-2 staves): 3 layers at r = 2.5, 3.2, 4.0 cm, 12/16/20 staves, |z| &lt; 13.5 cm. INTT (Intermediate Silicon Tracker, strips): 2 barrels / 4 ladder layers, r ≈ 7–10 cm. TPC (Time Projection Chamber): 20 &lt; r &lt; 78 cm (pads 30–78 cm), |z| &lt; 1.05 m, |η| &lt; 1.1, Ne–CF₄, 72 quad-GEM (Gas Electron Multiplier) modules, 3 radial × 12 φ per end. TPOT (TPC Outer Tracker): 8 Micromegas modules in 3 sectors below the TPC (sPHENIX, arXiv:2410.18031; Klest et al., arXiv:2110.02082).</li>
+        <li><i>Calorimetry</i>, |η| &lt; 1.1, full φ: EMCal W/SciFi SPACAL, r ≈ 0.90–1.16 m, 256 φ × 96 η towers of Δη×Δφ ≈ 0.024×0.024, 18 X₀, σ<sub>E</sub>/E ≈ 14%/√E ⊕ 3% here (Aidala et al., IEEE TNS 65, 2901, 2018, arXiv:1704.01461). Inner HCal (Al, inside the cryostat) r ≈ 1.16–1.37 m and Outer HCal (steel, also the flux return) r ≈ 1.82–2.69 m, each 24 η × 64 φ towers of 0.1×0.1 with tilted plates; ≈ 4.9 λ<sub>I</sub> total (sPHENIX TDR, 2019).</li>
+        <li><i>Forward / trigger</i>: MBD (Minimum-Bias Detector, ex-PHENIX BBC) 2 × 64 quartz + PMT at |z| = 2.50 m, 3.61 &lt; |η| &lt; 4.51. sEPD (sPHENIX Event-Plane Detector) 2 scintillator wheels at |z| ≈ 3.16 m, 2.0 &lt; |η| &lt; 4.9, 24 sectors × 31 tiles drawn as 16 rings. ZDCs at ±18 m behind the DX magnets (arXiv:2410.18031). Dimensions are approximate published values, not the GEANT4 geometry.</li>
+        <li><i>Glauber MC</i>: Woods–Saxon Au (R = 6.38, a = 0.535 fm), σ<sub>NN</sub><sup>inel</sup> = 42 mb (Miller et al., Ann. Rev. Nucl. Part. Sci. 57, 205, 2007). Bulk: two-component dN/dη tuned to ≈ 690 for 0–5% Au+Au (PHOBOS, PRC 83, 024913, 2011), ≈ 2.3 in p+p; v₂ from ε₂.</li>
+        <li><i>Hard probes</i> (embedded): dijet with leading p<sub>T</sub> 15–45 GeV, toy fragmentation (≈ 60% charged, 30% π⁰ → γγ, 10% n/K⁰<sub>L</sub>); in Au+Au the recoil jet loses energy with centrality and radiates soft particles at large angle, giving x<sub>J</sub> imbalance (qualitatively after ATLAS, PRL 105, 252303, 2010). Υ(1S) → e⁺e⁻ (m = 9.46 GeV), |y| &lt; 1. Jet cones drawn with R = 0.4.</li>
+        <li><i>Response</i>: helices in uniform 1.4 T up to the EMCal face (R[m] = p<sub>T</sub>/(0.42·GeV)); e/γ shower in the EMCal; hadrons start a shower in the EMCal with P ≈ 1 − e<sup>−0.83</sup>, otherwise leave a MIP and shower in the iHCal / oHCal. Toy shares, not a GEANT simulation.</li>
+      </ul>
+    </details>
+  </section>
+
+  <aside class="panel" id="legend" aria-label="Colour legend"></aside>
+
+  <section class="panel collapsed" id="controls" aria-label="Controls">
+    <div class="ctl-bar">
+      <button id="ctlToggle" type="button" aria-expanded="false" aria-controls="ctlBody">Controls<span class="chev" aria-hidden="true">▾</span></button>
+      <button id="bNext" class="primary">New event</button>
+      <button id="bReplay">Replay</button>
+      <button id="bPause" aria-pressed="false">Pause</button>
+      <button id="bShot" hidden>Save screenshot</button>
+      <label class="chk"><input id="cLight" type="checkbox">Light background</label>
+    </div>
+    <div class="ctl-body" id="ctlBody">
+    <div class="grp">
+      <span>System</span>
+      <select id="iSys" aria-label="Collision system"></select>
+    </div>
+    <div class="grp">
+      <span>Probe</span>
+      <select id="iProbe" aria-label="Embedded hard probe">
+        <option value="dijet">Dijet</option>
+        <option value="ups">Υ(1S) → e⁺e⁻</option>
+        <option value="none">None (min. bias)</option>
+      </select>
+    </div>
+    <div class="grp" id="gCent">
+      <span>Centrality</span>
+      <input id="iCent" type="range" min="0" max="80" step="5" value="0" aria-label="Centrality percent">
+      <output id="oCent">0–5%</output>
+    </div>
+    <div class="grp">
+      <span>Towers ≥</span>
+      <select id="iThr" aria-label="Tower display threshold (GeV)">
+        <option value="0.1">0.1 GeV</option>
+        <option value="0.3" selected>0.3 GeV</option>
+        <option value="0.6">0.6 GeV</option>
+        <option value="1">1 GeV</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>Colour</span>
+      <select id="iColor" aria-label="Track colour mode">
+        <option value="pt">pT</option>
+        <option value="probe">Probe vs bulk</option>
+        <option value="charge">Charge</option>
+        <option value="species">Species</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>View</span>
+      <button id="v3d" aria-pressed="true">3D</button>
+      <button id="vBeam" aria-pressed="false">Beam axis</button>
+      <button id="vSide" aria-pressed="false">Side</button>
+      <button id="vIn" aria-pressed="false">Inner</button>
+      <button id="vFwd" aria-pressed="false">Forward</button>
+    </div>
+    <div class="grp zoom">
+      <span>Nuclei zoom</span>
+      <input id="iZoom" type="range" min="0" max="13.66" step="0.01" value="0" aria-label="Nuclei magnification, log10 scale">
+      <output id="oZoom">1× (true size)</output>
+    </div>
+    <div class="grp">
+      <span>Speed</span>
+      <input id="iSpeed" type="range" min="0.2" max="10" step="0.1" value="2" aria-label="Playback speed">
+      <output id="oSpeed">2.0×</output>
+    </div>
+    <div class="grp">
+      <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cJet" type="checkbox" checked>Jet cones</label>
+      <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
+      <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
+      <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
+    </div>
+  </section>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.tsl.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three/webgpu';
+import { uniform, attribute, float, vec3, color, mix, step, smoothstep, exp, abs, dot, fract, fwidth, min, max,
+         positionLocal, normalView, positionViewDirection, mx_noise_float, time, pass } from 'three/tsl';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+/* ================= sPHENIX geometry (metres; sPHENIX frame: +z = North, +y = up) =================
+   Published dimensions (sPHENIX TDR 2019; arXiv:2410.18031; TPC arXiv:2110.02082; EMCal arXiv:1704.01461).
+   Approximate at the cm level: good for an event display, not for physics. */
+const D2R = Math.PI / 180;
+const BFIELD = 1.4;                                   // T (ex-BaBar solenoid)
+const MP = 0.9383, ETA_C = 1.1;                       // central acceptance |η| < 1.1
+const BP_R = 0.020, ZBEAM = 20;
+const MVTX_R = [0.025, 0.032, 0.040], MVTX_N = [12, 16, 20], MVTX_HL = 0.135;
+const INTT_R = [0.0719, 0.0773, 0.0968, 0.1026], INTT_N = [12, 12, 16, 16], INTT_HL = 0.23;
+const TPC_RIN = 0.20, TPC_RPAD = 0.30, TPC_ROUT = 0.78, TPC_HL = 1.05, TPC_MOD = [0.30, 0.405, 0.578, 0.78];
+const TPOT_R = 0.84;
+const TPOT = [[270, -0.66], [270, -0.22], [270, 0.22], [270, 0.66], [249, -0.22], [249, 0.22], [291, -0.22], [291, 0.22]]   // [φ°, z] of the 8 modules
+  .map(([p, z]) => ({ ph: p * D2R, z, dph: 0.30 / TPOT_R / 2, dz: 0.21 }));
+const EMC_R0 = 0.90, EMC_R1 = 1.14, IH_R0 = 1.16, IH_R1 = 1.37, OH_R0 = 1.82, OH_R1 = 2.69, OH_HL = 3.16;
+const CRY_R0 = 1.40, CRY_R1 = 1.73, MAG_HL = 1.925;
+const MBD_Z = 2.50, MBD_R0 = MBD_Z / Math.sinh(4.51), MBD_R1 = MBD_Z / Math.sinh(3.61);
+const SEPD_Z = 3.16, SEPD_R0 = SEPD_Z / Math.sinh(4.9), SEPD_R1 = SEPD_Z / Math.sinh(2.0);
+const ZDC_Z = 18.0;
+
+/* animation constants */
+const V_NUC = 1.2, T0 = 0.55, V_TRK = 1.4;
+const MAXTRK = 6500, MAXSEG = 110, MAXV = MAXTRK * MAXSEG * 2, MAXH = MAXTRK * 10, MAXG = 9000, MAXTW = 12000;
+const normPhi = p => ((p % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+const clamp01 = x => Math.min(1, Math.max(0, x));
+
+/* ================= collision systems ================= */
+const NUCLEI = {
+  Au: { A: 197, Z: 79, R: 6.38, a: 0.535, tag: '¹⁹⁷Au' },
+  p:  { A: 1, Z: 1, R: 0.5, tag: 'p' },
+};
+const SYSTEMS = {
+  AuAu: { A: 'Au', B: 'Au', name: 'Au+Au', rs: 200, runs: 'Runs 23 · 24 · 25' },
+  pp:   { A: 'p', B: 'p', name: 'p+p', rs: 200, runs: 'Run 24 (polarised)' },
+};
+const yBeamCM = rs => Math.acosh(rs / (2 * MP));
+
+/* nuclei magnification (slider): 1 = true size; max puts R_Au ≈ 12 cm (inside the INTT/TPC bore) */
+const S0 = 0.12 / 6.38, MAG0 = S0 / 1e-15;
+let S = 1e-15;
+
+/* ---------------- renderer ---------------- */
+let renderer;
+try {
+  renderer = new THREE.WebGPURenderer({ antialias: true, preserveDrawingBuffer: true });
+  await renderer.init();
+} catch (e) { fail('Could not start a WebGPU or WebGL2 renderer in this browser.'); throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x060a13, 1);
+app.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x060a13, 16, 32);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.005, 120);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.12; controls.maxDistance = 30;
+controls.autoRotateSpeed = 0.6; controls.autoRotate = true;
+
+scene.add(new THREE.HemisphereLight(0xbfd2ff, 0x1a1408, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, 4); scene.add(sun);
+
+/* ---------------- uniforms ---------------- */
+const uT = uniform(0);
+const uDet = uniform(1);
+const uFire = uniform(0);
+const uLight = uniform(0);
+const uJet = uniform(0);
+const uTrkOp = uniform(0.9);
+const themed = [];
+
+/* ---------------- detector ---------------- */
+const det = new THREE.Group(); scene.add(det);
+
+function shellMat(hex, rim, base) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = f.mul(rim).add(base).mul(uDet).mul(mix(float(1), float(1.6), uLight));
+  themed.push(m);
+  return m;
+}
+function faceMat(hex, op) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = float(op).mul(uDet).mul(mix(float(1), float(1.8), uLight));
+  themed.push(m);
+  return m;
+}
+function cyl(r, hl, mat, sides = 96, z0 = 0, parent = det) {
+  const g = new THREE.CylinderGeometry(r, r, 2 * hl, sides, 1, true);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, z0);
+  const m = new THREE.Mesh(g, mat); parent.add(m); return m;
+}
+function ring(r0, r1, z, mat, sides = 96, parent = det) {
+  const g = new THREE.RingGeometry(r0, r1, sides, 1); g.translate(0, 0, z);
+  const m = new THREE.Mesh(g, mat); parent.add(m); return m;
+}
+const lineMats = [];
+const lineMat = (hex, op) => {
+  const m = new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+  m.userData.base = { color: new THREE.Color(hex), opacity: op };
+  lineMats.push(m);
+  return m;
+};
+function segs(v, mat, parent = det) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
+}
+function ringV(v, r, z, n, a0 = 0, a1 = 2 * Math.PI) {
+  for (let i = 0; i < n; i++) {
+    const p0 = a0 + i / n * (a1 - a0), p1 = a0 + (i + 1) / n * (a1 - a0);
+    v.push(r * Math.cos(p0), r * Math.sin(p0), z, r * Math.cos(p1), r * Math.sin(p1), z);
+  }
+  return v;
+}
+const boxEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+function box(cx, cy, cz, sx, sy, sz, rotZ, lmat, fmat, parent = det) {   // sx radial, sy tangential when rotZ = φ
+  for (const [geo, mat] of [[boxEdges, lmat], [boxGeo, fmat]]) {
+    if (!mat) continue;
+    const o = geo === boxEdges ? new THREE.LineSegments(geo, mat) : new THREE.Mesh(geo, mat);
+    o.position.set(cx, cy, cz); o.scale.set(sx, sy, sz); o.rotation.z = rotZ; parent.add(o);
+  }
+}
+// flat staves/ladders tangent to a cylinder (polygon barrel), tilted by `tilt` (turbine arrangement)
+function staves(r, n, hl, width, tilt, lmat, fmat) {
+  for (let k = 0; k < n; k++) {
+    const ph = (k + 0.5) / n * 2 * Math.PI;
+    box(r * Math.cos(ph), r * Math.sin(ph), 0, 0.0012, width, 2 * hl, ph + tilt, lmat, fmat);
+  }
+}
+
+// --- beam line & Be pipe
+segs([0, 0, -ZBEAM, 0, 0, ZBEAM], lineMat(0x8796b1, 0.35), scene);
+cyl(BP_R, 0.40, shellMat('#c7d2e4', 0.3, 0.012), 24);
+cyl(BP_R + 0.001, 2.6, shellMat('#8796b1', 0.15, 0.006), 24);
+
+// --- MVTX (3 layers of ITS-2 staves) and INTT (4 ladder layers)
+for (let l = 0; l < 3; l++) {
+  const w = 2 * MVTX_R[l] * Math.tan(Math.PI / MVTX_N[l]) * 1.12;
+  staves(MVTX_R[l], MVTX_N[l], MVTX_HL, w, 0.22, lineMat(0x5fd3c6, 0.4), faceMat('#5fd3c6', 0.025));
+}
+for (let l = 0; l < 4; l++) {
+  const w = 2 * INTT_R[l] * Math.tan(Math.PI / INTT_N[l]) * 1.05;
+  staves(INTT_R[l], INTT_N[l], INTT_HL, w, 0.12, lineMat(0x9fe08a, 0.28), faceMat('#9fe08a', 0.012));
+}
+
+// --- TPC: field cages, central membrane, 12 sectors per end, 3 radial module rings
+const tpcMat = shellMat('#6f8db8', 0.42, 0.012);
+cyl(TPC_ROUT, TPC_HL, tpcMat); cyl(TPC_RIN, TPC_HL, tpcMat, 64);
+{
+  const v = [], vs = [];
+  for (const z of [-TPC_HL, TPC_HL]) {
+    ringV(v, TPC_ROUT, z, 128); ringV(v, TPC_RIN, z, 64);
+    for (const r of TPC_MOD.slice(0, 3)) ringV(vs, r, z, 96);
+    for (let s = 0; s < 12; s++) { const a = (30 * s) * D2R; vs.push(TPC_RPAD * Math.cos(a), TPC_RPAD * Math.sin(a), z, TPC_ROUT * Math.cos(a), TPC_ROUT * Math.sin(a), z); }
+  }
+  segs(v, lineMat(0x6f8db8, 0.38)); segs(vs, lineMat(0x6f8db8, 0.22));
+  segs(ringV([], TPC_ROUT, 0, 128), lineMat(0xffb24a, 0.18));            // central membrane
+  ring(TPC_RPAD, TPC_ROUT, -TPC_HL, faceMat('#6f8db8', 0.02)); ring(TPC_RPAD, TPC_ROUT, TPC_HL, faceMat('#6f8db8', 0.02));
+}
+// --- TPOT: 8 Micromegas modules under the TPC
+{
+  const tL = lineMat(0xff9ec7, 0.45), tF = faceMat('#ff9ec7', 0.06);
+  for (const m of TPOT) box(TPOT_R * Math.cos(m.ph), TPOT_R * Math.sin(m.ph), m.z, 0.012, 2 * m.dph * TPOT_R, 2 * m.dz, m.ph, tL, tF);
+}
+
+/* ================= calorimeters: EMCal, inner HCal, outer HCal ================= */
+const CALS = [];
+let NTOW = 0;
+function addCal(c) { c.base = NTOW; NTOW += c.nU * c.nV; CALS.push(c); return c; }
+function barrel(name, r0, r1, nU, nV, mod, col, res, extra = {}) {
+  const dph = 2 * Math.PI / nU, deta = 2 * ETA_C / nV;
+  return addCal({
+    name, r0, r1, nU, nV, mod, col, res, ...extra,
+    zmax: r0 * Math.sinh(ETA_C),
+    surf: (u, v) => { const ph = u * dph, et = -ETA_C + v * deta; return [r0 * Math.cos(ph), r0 * Math.sin(ph), r0 * Math.sinh(et)]; },
+    locate: (x, y, z) => { const r = Math.hypot(x, y); return [normPhi(Math.atan2(y, x)) / dph, (Math.asinh(z / r) + ETA_C) / deta]; },
+    cell(iu, iv) {
+      const c = new THREE.Vector3(...this.surf(iu + 0.5, iv + 0.5)), a = c.clone().normalize();
+      const ph = (iu + 0.5) * dph, et = -ETA_C + (iv + 0.5) * deta, e1 = new THREE.Vector3(-Math.sin(ph), Math.cos(ph), 0);
+      return { c, a, e1, e2: new THREE.Vector3().crossVectors(a, e1).normalize(), w1: 0.5 * 0.88 * r0 * dph, w2: 0.5 * 0.88 * r0 * deta,
+               Hmax: (r1 - r0) * Math.cosh(et) * 0.96 };
+    },
+  });
+}
+const EMC = barrel('EMCal', EMC_R0, EMC_R1, 256, 96, [1 / 8, 1 / 48], '#c79bff', [0.14, 0.03], { k: 0.32 });
+const IHC = barrel('iHCal', IH_R0, IH_R1, 64, 24, [1 / 2, 1 / 12], '#7fd1a8', [0.6, 0.1], { k: 0.55 });
+const OHC = barrel('oHCal', OH_R0, OH_R1, 64, 24, [1 / 2, 1 / 12], '#d9824a', [0.6, 0.1], { k: 0.5 });
+const towE = new Float32Array(NTOW), towT = new Float32Array(NTOW);
+const towGeo = [];
+for (const cal of CALS) for (let iu = 0; iu < cal.nU; iu++) for (let iv = 0; iv < cal.nV; iv++) towGeo[cal.base + iu * cal.nV + iv] = cal.cell(iu, iv);
+
+function calFaceMat(hex, modU, modV, k = 1) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const uvT = attribute('uvT', 'vec2');
+  const gridLine = (q, wmul) => {
+    const f = fract(q), w = fwidth(q).mul(wmul);
+    const d = min(f, float(1).sub(f));
+    const l = float(1).sub(smoothstep(float(0), w, d));
+    return max(l.x, l.y);
+  };
+  const fw = fwidth(uvT);
+  const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
+  const tower = gridLine(uvT, 1.0).mul(fade);
+  const module = gridLine(uvT.mul(vec3(modU, modV, 0).xy), 1.4);
+  m.colorNode = mix(color(hex), color(hex).mul(0.55), uLight);
+  m.opacityNode = float(0.025).add(tower.mul(0.15)).add(module.mul(0.24)).mul(k).mul(uDet).mul(mix(float(1), float(1.5), uLight));
+  themed.push(m);
+  return m;
+}
+for (const cal of CALS) {
+  const nU = cal.nU, nV = cal.nV, pos = [], uv = [], idx = [];
+  for (let i = 0; i <= nU; i++) for (let j = 0; j <= nV; j++) { pos.push(...cal.surf(i, j)); uv.push(i, j); }
+  for (let i = 0; i < nU; i++) for (let j = 0; j < nV; j++) { const a = i * (nV + 1) + j, b = a + nV + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uvT', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx); g.computeVertexNormals();
+  det.add(new THREE.Mesh(g, calFaceMat(cal.col, cal.mod[0], cal.mod[1], cal.k)));
+}
+{ // calorimeter outlines: EMCal (64 sectors = 32 φ × 2 halves), HCals (32 sectors, tilted plates at the ends)
+  const v = [];
+  for (const s of [-1, 1]) { ringV(v, EMC_R0, s * EMC.zmax, 128); ringV(v, EMC_R1, s * EMC_R1 * Math.sinh(ETA_C), 128); }
+  ringV(v, EMC_R1, 0, 128);
+  for (let k = 0; k < 32; k++) { const a = k / 32 * 2 * Math.PI, z = EMC_R1 * Math.sinh(ETA_C); v.push(EMC_R1 * Math.cos(a), EMC_R1 * Math.sin(a), -z, EMC_R1 * Math.cos(a), EMC_R1 * Math.sin(a), z); }
+  segs(v, lineMat(0xc79bff, 0.2));
+  ring(EMC_R0, EMC_R1, EMC.zmax, faceMat('#c79bff', 0.02), 128); ring(EMC_R0, EMC_R1, -EMC.zmax, faceMat('#c79bff', 0.02), 128);
+  const plates = (r0, r1, hl, n, tilt, hex, op) => {
+    const w = [];
+    for (const z of [-hl, hl]) {
+      ringV(w, r0, z, 128); ringV(w, r1, z, 128);
+      for (let k = 0; k < n; k++) {                       // plate cross-sections: lines tilted from radial by `tilt`
+        const a = k / n * 2 * Math.PI, L = (r1 - r0) / Math.cos(tilt);
+        const p0 = [r0 * Math.cos(a), r0 * Math.sin(a)], d = [Math.cos(a + tilt), Math.sin(a + tilt)];
+        // find t such that |p0 + t d| = r1
+        const b = p0[0] * d[0] + p0[1] * d[1], t = -b + Math.sqrt(b * b - r0 * r0 + r1 * r1);
+        w.push(p0[0], p0[1], z, p0[0] + t * d[0], p0[1] + t * d[1], z);
+      }
+    }
+    for (let k = 0; k < 32; k++) { const a = k / 32 * 2 * Math.PI; w.push(r1 * Math.cos(a), r1 * Math.sin(a), -hl, r1 * Math.cos(a), r1 * Math.sin(a), hl); }
+    segs(w, lineMat(hex, op));
+    ring(r0, r1, hl, faceMat('#' + new THREE.Color(hex).getHexString(), 0.022), 128); ring(r0, r1, -hl, faceMat('#' + new THREE.Color(hex).getHexString(), 0.022), 128);
+  };
+  plates(IH_R0, IH_R1, IHC.zmax + 0.15, 128, 32 * D2R, 0x7fd1a8, 0.16);
+  plates(OH_R0, OH_R1, OH_HL, 128, 12 * D2R, 0xd9824a, 0.14);
+  const oh = shellMat('#d9824a', 0.22, 0.008); cyl(OH_R1, OH_HL, oh, 128);
+}
+// --- solenoid cryostat (red)
+const coilMat = shellMat('#c44a3a', 0.32, 0.01);
+cyl(CRY_R0, MAG_HL, coilMat, 120); cyl(CRY_R1, MAG_HL, coilMat, 120);
+{
+  const v = []; for (const z of [-MAG_HL, MAG_HL]) { ringV(v, CRY_R0, z, 120); ringV(v, CRY_R1, z, 120); }
+  segs(v, lineMat(0xc44a3a, 0.3));
+  for (const s of [-1, 1]) ring(CRY_R0, CRY_R1, s * MAG_HL, faceMat('#c44a3a', 0.03), 120);
+}
+// --- MBD: 64 PMTs per arm (hexagonal quartz radiators), three rings
+for (const s of [-1, 1]) {
+  const v = [], hexR = 0.0145;
+  const rings = [[MBD_R0 + 0.012, 16], [(MBD_R0 + MBD_R1) / 2, 22], [MBD_R1 - 0.014, 26]];
+  for (const [rr, n] of rings) for (let k = 0; k < n; k++) {
+    const a = (k + 0.5) / n * 2 * Math.PI, c = [rr * Math.cos(a), rr * Math.sin(a)];
+    for (let i = 0; i < 6; i++) { const a0 = i / 6 * 2 * Math.PI, a1 = (i + 1) / 6 * 2 * Math.PI; v.push(c[0] + hexR * Math.cos(a0), c[1] + hexR * Math.sin(a0), s * MBD_Z, c[0] + hexR * Math.cos(a1), c[1] + hexR * Math.sin(a1), s * MBD_Z); }
+  }
+  segs(v, lineMat(0x9fb7e0, 0.38));
+  ring(MBD_R0, MBD_R1, s * MBD_Z, faceMat('#9fb7e0', 0.04), 48);
+}
+// --- sEPD: two wheels, 24 sectors × 16 radial rows
+const SEPD_REDGE = Array.from({ length: 17 }, (_, i) => SEPD_R0 + (SEPD_R1 - SEPD_R0) * i / 16);
+for (const s of [-1, 1]) {
+  const v = [], z = s * SEPD_Z;
+  for (let i = 0; i < 17; i++) ringV(v, SEPD_REDGE[i], z, 96);
+  for (let k = 0; k < 24; k++) {
+    const a = k * 15 * D2R, r0 = k % 2 ? SEPD_REDGE[1] : SEPD_R0;
+    v.push(r0 * Math.cos(a), r0 * Math.sin(a), z, SEPD_R1 * Math.cos(a), SEPD_R1 * Math.sin(a), z);
+  }
+  segs(v, lineMat(0x5fd3c6, 0.3));
+  ring(SEPD_R0, SEPD_R1, z, faceMat('#5fd3c6', 0.03));
+}
+// --- ZDCs (±18 m)
+for (const s of [-1, 1]) box(0, 0, s * (ZDC_Z + 0.5), 0.10, 0.10, 1.0, 0, lineMat(0x9fb7e0, 0.4), faceMat('#9fb7e0', 0.05));
+
+/* ---------------- jet cones (R = 0.4) ---------------- */
+const jetMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+{
+  const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(2);
+  jetMat.colorNode = mix(color('#ffb24a'), color('#b86400'), uLight);
+  jetMat.opacityNode = f.mul(0.22).add(0.03).mul(uJet);
+  themed.push(jetMat);
+}
+const jetG = new THREE.Group(); scene.add(jetG);
+const jetCones = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.BufferGeometry(), jetMat); m.visible = false; jetG.add(m); return m; });
+function placeCone(m, J, vtx) {
+  const ch = Math.cosh(J.eta), half = 0.4 / ch, L = IH_R1 * ch;
+  m.geometry.dispose();
+  const g = new THREE.ConeGeometry(L * Math.tan(half), L, 48, 1, true); g.translate(0, -L / 2, 0);
+  m.geometry = g;
+  const d = new THREE.Vector3(Math.cos(J.phi), Math.sin(J.phi), Math.sinh(J.eta)).normalize();
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), d);
+  m.position.copy(vtx); m.visible = true;
+}
+
+/* ---------------- nuclei (instanced nucleons) ---------------- */
+const NUC = 400;
+const nucMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.4, metalness: 0.15 });
+const nucMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), nucMat, NUC);
+nucMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+for (let i = 0; i < NUC; i++) nucMesh.setColorAt(i, new THREE.Color(0x9fb2cf));
+nucMesh.frustumCulled = false; nucMesh.count = 0;
+scene.add(nucMesh);
+
+/* ---------------- fireball ---------------- */
+const fireMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const n = mx_noise_float(positionLocal.mul(3.2).add(vec3(0, 0, time.mul(1.4))));
+  const core = abs(dot(normalView, positionViewDirection)).pow(1.6);
+  fireMat.colorNode = mix(mix(color('#ff4a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7),
+                          mix(color('#d92e00'), color('#ff9a1f'), core.add(n.mul(0.35)).clamp(0, 1)), uLight);
+  themed.push(fireMat);
+  fireMat.opacityNode = uFire.mul(core.mul(0.85).add(0.12)).mul(n.mul(0.45).add(0.8));
+}
+const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 5), fireMat);
+const fireGroup = new THREE.Group(); fireGroup.add(fire); scene.add(fireGroup);
+
+/* ---------------- tracks ---------------- */
+const tPos = new Float32Array(MAXV * 3), tPath = new Float32Array(MAXV), tCol = new Float32Array(MAXV * 3);
+const trkGeo = new THREE.BufferGeometry();
+const aPos = new THREE.BufferAttribute(tPos, 3).setUsage(THREE.DynamicDrawUsage);
+const aPath = new THREE.BufferAttribute(tPath, 1).setUsage(THREE.DynamicDrawUsage);
+const aCol = new THREE.BufferAttribute(tCol, 3).setUsage(THREE.DynamicDrawUsage);
+trkGeo.setAttribute('position', aPos); trkGeo.setAttribute('pathT', aPath); trkGeo.setAttribute('tcol', aCol);
+trkGeo.setDrawRange(0, 0);
+const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const head = exp(uT.sub(pT).max(0).mul(-7)).mul(2.6).add(1);
+  const rT = positionLocal.xy.length();
+  const zA = abs(positionLocal.z);
+  const inGas = smoothstep(0.27, 0.31, rT).mul(float(1).sub(smoothstep(0.77, 0.8, rT))).mul(float(1).sub(smoothstep(1.03, 1.07, zA)));
+  const inSi = float(1).sub(smoothstep(0.10, 0.12, rT)).mul(float(1).sub(smoothstep(0.22, 0.25, zA)));
+  const outer = mix(float(0.2), float(1), max(inGas, inSi.mul(0.35)));
+  trkMat.colorNode = attribute('tcol', 'vec3').mul(mix(head, float(0.72), uLight));
+  themed.push(trkMat);
+  trkMat.opacityNode = step(pT, uT).mul(outer).mul(uTrkOp);
+}
+const tracks = new THREE.LineSegments(trkGeo, trkMat); tracks.frustumCulled = false; scene.add(tracks);
+
+/* ---------------- hits ---------------- */
+const hitGeo = new THREE.OctahedronGeometry(1, 0);
+const hT = new THREE.InstancedBufferAttribute(new Float32Array(MAXH), 1).setUsage(THREE.DynamicDrawUsage);
+const hC = new THREE.InstancedBufferAttribute(new Float32Array(MAXH * 3), 3).setUsage(THREE.DynamicDrawUsage);
+hitGeo.setAttribute('hitT', hT); hitGeo.setAttribute('hcol', hC);
+const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const ht = attribute('hitT', 'float');
+  hitMat.colorNode = attribute('hcol', 'vec3').mul(mix(exp(uT.sub(ht).max(0).mul(-5)).mul(2.5).add(0.55), float(0.6), uLight));
+  themed.push(hitMat);
+  hitMat.opacityNode = step(ht, uT);
+}
+const hits = new THREE.InstancedMesh(hitGeo, hitMat, MAXH); hits.count = 0; hits.frustumCulled = false;
+hits.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(hits);
+
+/* ---------------- calorimeter towers (projective boxes inside each calorimeter, height ∝ log E) ---------------- */
+const TV = 20;
+const twBuf = {
+  position: new Float32Array(MAXTW * TV * 3), normal: new Float32Array(MAXTW * TV * 3),
+  dH: new Float32Array(MAXTW * TV * 3), ctr: new Float32Array(MAXTW * TV * 3), ecol: new Float32Array(MAXTW * TV * 3),
+  top: new Float32Array(MAXTW * TV), tArr: new Float32Array(MAXTW * TV),
+};
+const twGeo = new THREE.BufferGeometry();
+const twAttr = {};
+for (const [k, arr] of Object.entries(twBuf)) {
+  twAttr[k] = new THREE.BufferAttribute(arr, arr.length === MAXTW * TV ? 1 : 3).setUsage(THREE.DynamicDrawUsage);
+  twGeo.setAttribute(k, twAttr[k]);
+}
+{
+  const idx = new Uint32Array(MAXTW * 30);
+  for (let t = 0, o = 0; t < MAXTW; t++) for (let q = 0; q < 5; q++) { const b = t * TV + q * 4; idx.set([b, b + 1, b + 2, b, b + 2, b + 3], o); o += 6; }
+  twGeo.setIndex(new THREE.BufferAttribute(idx, 1));
+}
+twGeo.setDrawRange(0, 0);
+const towMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
+{
+  const top = attribute('top', 'float'), dH = attribute('dH', 'vec3'), ta = attribute('tArr', 'float'), ctr = attribute('ctr', 'vec3');
+  const grow = smoothstep(ta, ta.add(0.5), uT);
+  const risen = positionLocal.sub(dH.mul(top).mul(float(1).sub(grow)));
+  towMat.positionNode = mix(ctr, risen, step(ta, uT));
+  const col = attribute('ecol', 'vec3');
+  towMat.colorNode = col;
+  towMat.emissiveNode = col.mul(exp(uT.sub(ta).max(0).mul(-3)).mul(2.4).add(0.3));
+}
+const towers = new THREE.Mesh(twGeo, towMat); towers.frustumCulled = false; scene.add(towers);
+
+const E_STOPS = [0.1, 20], E_FULL = 30;
+let E_THR = 0.3;                                       // display threshold (GeV), HCal uses 2×
+const E_COLS = ['#3d2b8f', '#9a3cc0', '#ff5a7a', '#ffb24a', '#fff3c4'].map(h => new THREE.Color(h));
+function energyColor(E, out) {
+  const x = THREE.MathUtils.clamp(Math.log10(E / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]), 0, 1) * 4;
+  const i = Math.min(3, Math.floor(x));
+  return out.copy(E_COLS[i]).lerp(E_COLS[i + 1], x - i);
+}
+
+/* ---------------- photons ---------------- */
+const gBuf = { position: new Float32Array(MAXG * 6), pathT: new Float32Array(MAXG * 2), gE: new Float32Array(MAXG * 2) };
+const gGeo = new THREE.BufferGeometry();
+const gAttr = {
+  position: new THREE.BufferAttribute(gBuf.position, 3).setUsage(THREE.DynamicDrawUsage),
+  pathT: new THREE.BufferAttribute(gBuf.pathT, 1).setUsage(THREE.DynamicDrawUsage),
+  gE: new THREE.BufferAttribute(gBuf.gE, 1).setUsage(THREE.DynamicDrawUsage),
+};
+for (const [k, a] of Object.entries(gAttr)) gGeo.setAttribute(k, a);
+gGeo.setDrawRange(0, 0);
+const gMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const dash = step(fract(pT.mul(24)), float(0.5));
+  const head = exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1);
+  gMat.colorNode = mix(color('#fff0b8').mul(attribute('gE', 'float')).mul(head), color('#9a6a00'), uLight);
+  themed.push(gMat);
+  gMat.opacityNode = step(pT, uT).mul(dash).mul(0.8);
+}
+const gammas = new THREE.LineSegments(gGeo, gMat); gammas.frustumCulled = false; scene.add(gammas);
+
+/* ---------------- bloom ---------------- */
+let post = null;
+try {
+  post = new THREE.PostProcessing(renderer);
+  const sp = pass(scene, camera);
+  const col = sp.getTextureNode('output');
+  post.outputNode = col.add(bloom(col, 0.6, 0.35, 0.15));
+} catch (e) { post = null; }
+
+/* ================= physics: Glauber + toy hadron production + embedded hard probes ================= */
+const rnd = Math.random;
+function gauss() { return Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd()); }
+
+function nucleus(key) {
+  const N = NUCLEI[key];
+  if (N.A === 1) return [[0, 0, 0, 1]];
+  const R = N.R, a = N.a, rmax = R + 6 * a, pts = [];
+  while (pts.length < N.A) {
+    const r = rnd() * rmax;
+    if (rnd() * rmax * rmax > r * r / (1 + Math.exp((r - R) / a))) continue;
+    const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = 2 * Math.PI * rnd();
+    const p = [r * st * Math.cos(ph), r * st * Math.sin(ph), r * ct, 0];
+    let ok = true;
+    for (const q of pts) { const dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2]; if (dx * dx + dy * dy + dz * dz < 0.16) { ok = false; break; } }
+    if (ok) pts.push(p);
+  }
+  let cx = 0, cy = 0, cz = 0; for (const p of pts) { cx += p[0]; cy += p[1]; cz += p[2]; }
+  cx /= N.A; cy /= N.A; cz /= N.A;
+  for (const p of pts) { p[0] -= cx; p[1] -= cy; p[2] -= cz; }
+  const idx = [...pts.keys()].sort(() => rnd() - 0.5);
+  for (let i = 0; i < N.Z; i++) pts[idx[i]][3] = 1;
+  return pts;
+}
+
+const PT_STOPS = [0, 0.4, 1, 2, 4];
+const PT_COLS = ['#3b5bff', '#2fc4e0', '#7be38a', '#ffd166', '#ff5d3a'].map(h => new THREE.Color(h));
+const CH_COLS = { '1': new THREE.Color('#ff7a59'), '-1': new THREE.Color('#4fa3ff') };
+const PR_COLS = { bulk: new THREE.Color('#3a4a68'), jet: new THREE.Color('#ffb24a'), ups: new THREE.Color('#5fe3ff') };
+const SP = [
+  { name: 'π±', m: 0.1396, theta: 0.25, col: new THREE.Color('#7aa2ff') },
+  { name: 'K±', m: 0.4937, theta: 0.36, col: new THREE.Color('#ffd166') },
+  { name: 'p, p̄', m: 0.9383, theta: 0.47, col: new THREE.Color('#ff6b8b') },
+  { name: 'e±', m: 0.000511, theta: 0.3, col: new THREE.Color('#5fe3ff') },
+];
+const tmpC = new THREE.Color();
+function trackColor(tr, mode) {
+  if (mode === 'charge') return CH_COLS[tr.q];
+  if (mode === 'species') return SP[tr.sp].col;
+  if (mode === 'probe') return PR_COLS[tr.tag || 'bulk'];
+  const p = Math.min(tr.pt, 4);
+  let i = 0; while (i < 3 && p > PT_STOPS[i + 1]) i++;
+  const f = (p - PT_STOPS[i]) / (PT_STOPS[i + 1] - PT_STOPS[i]);
+  return tmpC.copy(PT_COLS[i]).lerp(PT_COLS[i + 1], f);
+}
+
+let ev = null, evNo = 0;
+let colorMode = 'pt', probe = 'dijet', showJets = true;
+let sysKey = 'AuAu';
+
+/* ---------------- calorimeter response ---------------- */
+function deposit(cal, x, y, z, E, tArr, sigma, nS) {
+  const [u, v] = cal.locate(x, y, z);
+  if (!(v >= 0 && v < cal.nV)) return false;
+  const e = E / nS;
+  for (let i = 0; i < nS; i++) {
+    let iu = Math.floor(u + sigma * gauss()), iv = Math.floor(v + sigma * gauss());
+    iu = ((iu % cal.nU) + cal.nU) % cal.nU;                                 // φ wraps
+    if (iv < 0 || iv >= cal.nV) continue;
+    const id = cal.base + iu * cal.nV + iv;
+    if (towE[id] === 0 || tArr < towT[id]) towT[id] = tArr;
+    towE[id] += e;
+  }
+  return true;
+}
+const smear = (cal, E) => Math.max(0, E * (1 + gauss() * Math.hypot(cal.res[0] / Math.sqrt(Math.max(E, 0.05)), cal.res[1])));
+const inBarrel = (x, y, z) => Math.abs(Math.asinh(z / Math.max(Math.hypot(x, y), 1e-6))) < ETA_C;
+// hadron of energy E entering the calorimeter stack at (x,y,z) [direction ≈ from the vertex]; s = arrival path
+function hadronShower(x, y, z, E, s, neutral = false) {
+  const dS = 0.25;                                                          // stagger tower appearance by depth
+  if (!neutral && E < 0.35) { deposit(EMC, x, y, z, E * 0.7, s, 0.2, 2); return; }          // ranges out
+  if (rnd() < 0.43) {                                                       // 0.83 λ_I in the EMCal
+    const f = 0.2 + 0.45 * rnd();
+    deposit(EMC, x, y, z, E * f, s, 0.9, 10);
+    const R = E * (1 - f);
+    deposit(IHC, x, y, z, R * (0.25 + 0.15 * rnd()), s + dS, 0.35, 3);
+    deposit(OHC, x, y, z, R * (0.45 + 0.2 * rnd()), s + 2 * dS, 0.45, 4);
+  } else {
+    if (!neutral) deposit(EMC, x, y, z, 0.24 * (1 + 0.1 * gauss()), s, 0.1, 1);   // MIP
+    if (rnd() < 0.22) {
+      deposit(IHC, x, y, z, E * (0.25 + 0.15 * rnd()), s + dS, 0.35, 3);
+      deposit(OHC, x, y, z, E * (0.45 + 0.2 * rnd()), s + 2 * dS, 0.45, 4);
+    } else {
+      if (!neutral) deposit(IHC, x, y, z, 0.05, s + dS, 0.1, 1);
+      deposit(OHC, x, y, z, E * (0.6 + 0.25 * rnd()), s + 2 * dS, 0.45, 5);
+    }
+  }
+}
+
+// two-body decay M → (massless) a + b, isotropic in the rest frame, boosted to the lab
+function decay2(m, E, px, py, pz) {
+  const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = 2 * Math.PI * rnd(), e = m / 2;
+  const bx = px / E, by = py / E, bz = pz / E, b2 = bx * bx + by * by + bz * bz, g = E / m;
+  const out = [];
+  for (const s of [1, -1]) {
+    const qx = s * e * st * Math.cos(ph), qy = s * e * st * Math.sin(ph), qz = s * e * ct;
+    const bq = bx * qx + by * qy + bz * qz, k = b2 > 1e-12 ? (g - 1) * bq / b2 + g * e : g * e;
+    out.push([g * (e + bq), qx + k * bx, qy + k * by, qz + k * bz]);
+  }
+  return out;
+}
+
+function buildTowers() {
+  let n = 0, sumE = 0, sumH = 0, nAbove = 0;
+  const col = new THREE.Color(), corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]], B = twBuf;
+  for (let id = 0; id < NTOW; id++) {
+    const E = towE[id];
+    const isEM = id < IHC.base;
+    if (E < 0.1) continue;
+    if (isEM) sumE += E; else sumH += E;
+    const thr = isEM ? E_THR : 2 * E_THR;
+    if (E < thr) continue;
+    nAbove++;
+    if (n >= MAXTW) continue;
+    const { c, a, e1, e2, w1, w2, Hmax } = towGeo[id];
+    const H = Hmax * Math.max(0.06, clamp01(Math.log(E / thr) / Math.log(E_FULL / thr)));
+    energyColor(E, col);
+    const ct = c.clone().addScaledVector(a, H), k = ct.length() / c.length();
+    const bs = corners.map(([s1, s2]) => c.clone().addScaledVector(e1, s1 * w1).addScaledVector(e2, s2 * w2));
+    const ts = corners.map(([s1, s2]) => ct.clone().addScaledVector(e1, s1 * w1 * k).addScaledVector(e2, s2 * w2 * k));
+    const quads = [[ts, [1, 1, 1, 1], a]];
+    for (let q = 0; q < 4; q++) {
+      const q1 = (q + 1) % 4;
+      quads.push([[bs[q], bs[q1], ts[q1], ts[q]], [0, 0, 1, 1], bs[q].clone().add(bs[q1]).multiplyScalar(0.5).sub(c).normalize()]);
+    }
+    let vtx = n * TV;
+    for (const [pts, tops, nrm] of quads) for (let j = 0; j < 4; j++, vtx++) {
+      const o = vtx * 3;
+      B.position[o] = pts[j].x; B.position[o + 1] = pts[j].y; B.position[o + 2] = pts[j].z;
+      B.normal[o] = nrm.x; B.normal[o + 1] = nrm.y; B.normal[o + 2] = nrm.z;
+      B.dH[o] = a.x * H; B.dH[o + 1] = a.y * H; B.dH[o + 2] = a.z * H;
+      B.ctr[o] = c.x; B.ctr[o + 1] = c.y; B.ctr[o + 2] = c.z;
+      B.ecol[o] = col.r; B.ecol[o + 1] = col.g; B.ecol[o + 2] = col.b;
+      B.top[vtx] = tops[j]; B.tArr[vtx] = towT[id];
+    }
+    n++;
+  }
+  twGeo.setDrawRange(0, n * 30);
+  for (const at of Object.values(twAttr)) at.needsUpdate = true;
+  return { nTw: nAbove, sumE, sumH };
+}
+
+/* ---- bulk settings at √s = 200 GeV (same toy model as the STAR display) ---- */
+function kinematics(rs) {
+  const yb = yBeamCM(rs), L = Math.log(rs / 1.9), Lmax = Math.log(200 / 1.9);
+  return {
+    rs, yb, gCM: rs / (2 * MP), sigNN: 42,
+    npp: 2.25 * Math.pow(Math.max(L, 0.05) / Lmax, 0.85),
+    xhard: 0.13, sigY: Math.sqrt(Math.log(rs / (2 * MP))), kT: 1.0, tail: 0.03,
+    fK: 0.13, rK: Math.exp(-2.8 / Math.sqrt(rs)), piAsym: 0, fpp: 0.035 * Math.exp(-30 / rs),
+    yLoss: 2.0, k2: 0.21,
+  };
+}
+
+function generate(centPct) {
+  const S_ = SYSTEMS[sysKey], NA = NUCLEI[S_.A], NB = NUCLEI[S_.B];
+  const K = kinematics(S_.rs);
+  const d2 = K.sigNN / 10 / Math.PI;
+  const isPP = NA.A === 1 && NB.A === 1;
+  const bmax = isPP ? Math.sqrt(d2) : NA.R + NB.R + 2.0;
+
+  let A, B, b, c, partA, partB, ncoll = 0, tries = 0;
+  do {
+    c = isPP ? rnd() : Math.min(Math.max(centPct + 2.5 + (rnd() - 0.5) * 5, 0.3), 95) / 100;
+    if (tries > 20) c = rnd() * 0.5;
+    b = Math.sqrt(c) * bmax;
+    A = nucleus(S_.A); B = nucleus(S_.B);
+    for (const p of A) p[0] += b / 2;
+    for (const p of B) p[0] -= b / 2;
+    partA = new Uint8Array(A.length); partB = new Uint8Array(B.length); ncoll = 0;
+    for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
+      const dx = A[i][0] - B[j][0], dy = A[i][1] - B[j][1];
+      if (dx * dx + dy * dy < d2) { ncoll++; partA[i] = 1; partB[j] = 1; }
+    }
+    tries++;
+  } while (ncoll === 0 && tries < 60);
+  const rot = rnd() * Math.PI * 2, cr = Math.cos(rot), sr = Math.sin(rot);
+  for (const p of [...A, ...B]) { const x = p[0], y = p[1]; p[0] = cr * x - sr * y; p[1] = sr * x + cr * y; }
+  const nucleons = [];
+  A.forEach((p, i) => nucleons.push({ p, side: 1, part: partA[i], prot: p[3] }));
+  B.forEach((p, i) => nucleons.push({ p, side: -1, part: partB[i], prot: p[3] }));
+  const parts = nucleons.filter(n => n.part);
+  const npart = parts.length, npA = partA.reduce((a, x) => a + x, 0);
+
+  // participant eccentricity and plane
+  let mx = 0, my = 0; for (const n of parts) { mx += n.p[0]; my += n.p[1]; }
+  mx /= Math.max(npart, 1); my /= Math.max(npart, 1);
+  let r2 = 0, c2 = 0, s2 = 0;
+  for (const n of parts) { const x = n.p[0] - mx, y = n.p[1] - my, rr = x * x + y * y, ph = Math.atan2(y, x); r2 += rr; c2 += rr * Math.cos(2 * ph); s2 += rr * Math.sin(2 * ph); }
+  const eps2 = npart > 2 && r2 > 0 ? Math.hypot(c2, s2) / r2 : 0;
+  const psi2 = (Math.atan2(s2, c2) + Math.PI) / 2;
+  let su = 0, sv = 0; const cu = Math.cos(psi2), snu = Math.sin(psi2);
+  for (const n of parts) { const x = n.p[0] - mx, y = n.p[1] - my; const u = x * cu + y * snu, v = -x * snu + y * cu; su += u * u; sv += v * v; }
+  su = Math.sqrt(su / Math.max(npart, 1)) + 0.4; sv = Math.sqrt(sv / Math.max(npart, 1)) + 0.4;
+  const v2 = isPP ? 0 : THREE.MathUtils.clamp(K.k2 * eps2, -0.1, 0.2);
+
+  // ---- bulk particle list (rapidity y, pT, φ, species, charge)
+  const plist = [], neutrals = [], gammaSrc = [];                    // neutrals: [E, px,py,pz, tag]; gammaSrc: π⁰/η to decay
+  const samplePt = (theta) => {
+    const pt = rnd() > K.tail ? -theta * K.kT * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)) : 1.2 * Math.pow(rnd() + 1e-9, -1 / 4.5);
+    return Math.min(Math.max(pt, 0.03), 25);
+  };
+  const samplePhi = (v2pt) => {
+    const wmax = 1 + 2 * Math.abs(v2pt);
+    let phi; do { phi = rnd() * 2 * Math.PI; } while (rnd() * wmax > 1 + 2 * v2pt * Math.cos(2 * (phi - psi2)));
+    return phi;
+  };
+  const emit = (sp, q, y) => {
+    const pt = samplePt(SP[sp].theta);
+    plist.push({ sp, q, y, pt, phi: samplePhi(THREE.MathUtils.clamp(v2 * Math.min(pt / 0.7, 2.6), -0.15, 0.3)) });
+  };
+  const dndeta = K.npp * ((1 - K.xhard) * npart / 2 + K.xhard * ncoll);
+  const nMes = Math.round(dndeta * 1.15 * Math.sqrt(2 * Math.PI) * K.sigY * (1 + 0.05 * gauss()));
+  const wA = npart ? npA / npart : 0.5;
+  const yMes = () => (rnd() < wA ? 1 : -1) * 0.3 * K.sigY + K.sigY * gauss();
+  for (let k = 0; k < nMes; k++) {
+    const y = yMes();
+    if (rnd() < 1 / 3) {                                               // π⁰ (η with 11% relative rate)
+      const isEta = rnd() < 0.11, m = isEta ? 0.5479 : 0.135;
+      if (isEta && rnd() > 0.394) continue;
+      const pt = samplePt(isEta ? 0.40 : 0.25), phi = samplePhi(THREE.MathUtils.clamp(v2 * Math.min(pt / 0.7, 2.6), -0.15, 0.3)), mT = Math.hypot(m, pt);
+      gammaSrc.push([m, mT * Math.cosh(y), pt * Math.cos(phi), pt * Math.sin(phi), mT * Math.sinh(y), null]);
+      continue;
+    }
+    if (rnd() < K.fK * 1.5) emit(1, rnd() < 1 / (1 + K.rK) ? 1 : -1, y);
+    else emit(0, rnd() < 0.5 ? 1 : -1, y);
+    if (rnd() < K.fpp) { emit(2, 1, yMes()); emit(2, -1, yMes()); }
+  }
+  for (const n of parts) {
+    if (!n.prot) continue;
+    const y = n.side * Math.max(0, K.yb - K.yLoss) + Math.min(0.9, 0.35 + 0.3 * K.yb) * gauss();
+    emit(2, 1, Math.max(-K.yb, Math.min(K.yb, y)));
+  }
+
+  // ---- embedded hard probe
+  const jets = []; let ups = null;
+  const pushVec = (sp, q, pt, eta, phi, tag) => plist.push({ sp, q, y: eta, pt, phi, tag, eta });
+  function fragment(J, quenchE) {
+    // J: {pt, eta, phi}; constituents with power-law momentum fractions and jT ≈ 0.5 GeV
+    const n = Math.max(3, Math.round(2.2 + 2.1 * Math.log(J.pt) + 1.2 * gauss()));
+    const w = Array.from({ length: n }, () => Math.pow(rnd(), 2.4) + 0.004);
+    const sw = w.reduce((a, x) => a + x, 0);
+    const parts = w.map(x => [x / sw * J.pt, 0]);
+    if (quenchE > 0.5) {                                             // medium response: soft, wide-angle particles
+      let left = quenchE * 0.6;
+      while (left > 0.4) { const p = 0.4 + 1.6 * rnd(); parts.push([Math.min(p, left), 1]); left -= p; }
+    }
+    for (const [pt, wide] of parts) {
+      const sig = wide ? 0.7 : Math.min(0.3, 0.5 / (pt + 0.6));
+      const eta = J.eta + sig * gauss(), phi = J.phi + sig * gauss();
+      const r = rnd();
+      if (r < 0.6) { const s = rnd(); pushVec(s < 0.75 ? 0 : s < 0.9 ? 1 : 2, rnd() < 0.5 ? 1 : -1, pt, eta, phi, 'jet'); }
+      else if (r < 0.9) { const mT = Math.hypot(0.135, pt); gammaSrc.push([0.135, mT * Math.cosh(eta), pt * Math.cos(phi), pt * Math.sin(phi), mT * Math.sinh(eta), 'jet']); }
+      else { const E = pt * Math.cosh(eta); neutrals.push([E, pt * Math.cos(phi), pt * Math.sin(phi), pt * Math.sinh(eta), 'jet']); }
+    }
+  }
+  if (probe === 'dijet') {
+    const pt1 = 15 + 30 * Math.pow(rnd(), 1.6), eta1 = 1.4 * (rnd() - 0.5), phi1 = 2 * Math.PI * rnd();
+    // centrality-dependent energy loss of the recoil jet (toy x_J imbalance), none in p+p
+    const loss = isPP ? 0 : clamp01(npart / 330) * (0.15 + 0.35 * rnd());
+    const xJ = THREE.MathUtils.clamp(0.88 + 0.08 * gauss() - loss, 0.3, 1);
+    const pt2 = pt1 * xJ, eta2 = THREE.MathUtils.clamp(-0.3 * eta1 + 0.45 * gauss(), -0.7, 0.7), phi2 = phi1 + Math.PI + 0.12 * gauss();
+    jets.push({ pt: pt1, eta: eta1, phi: phi1 }, { pt: pt2, eta: eta2, phi: phi2, lost: pt1 * (0.88 - xJ) });
+    fragment(jets[0], 0); fragment(jets[1], Math.max(0, pt1 * 0.88 - pt2));
+  } else if (probe === 'ups') {
+    const m = 9.46, pt = -1.5 * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)), y = 2 * (rnd() - 0.5), phi = 2 * Math.PI * rnd(), mT = Math.hypot(m, pt);
+    const [e1, e2] = decay2(m, mT * Math.cosh(y), pt * Math.cos(phi), pt * Math.sin(phi), mT * Math.sinh(y));
+    ups = { pt, y, legs: [] };
+    [[e1, -1], [e2, 1]].forEach(([d, q]) => {
+      const ptl = Math.hypot(d[1], d[2]), eta = Math.asinh(d[3] / ptl);
+      ups.legs.push({ pt: ptl, eta }); pushVec(3, q, ptl, eta, Math.atan2(d[2], d[1]), 'ups');
+    });
+  }
+
+  // ---- tracking
+  const vx = 0.0002 * gauss(), vy = 0.0002 * gauss();
+  const vz = THREE.MathUtils.clamp(0.10 * gauss(), -0.3, 0.3);
+  const trks = [];
+  let nv = 0, nh = 0, maxPath = 0, nMBD = 0, nEPD = 0, nTPC = 0, nSi = 0, nIntt = 0, nTpot = 0;
+  const hitM = new THREE.Matrix4(), hq = new THREE.Quaternion(), hs = new THREE.Vector3(), hp = new THREE.Vector3();
+  towE.fill(0); towT.fill(0);
+  const addHit = (x, y, z, s, sc, tr) => {
+    if (nh >= MAXH) return;
+    hp.set(x, y, z); hs.setScalar(sc); hitM.compose(hp, hq, hs); hits.setMatrixAt(nh, hitM);
+    hT.array[nh] = s; nh++; tr.nh++;
+  };
+  const pushSeg = (x, y, z, s, nx, ny, nz, ns) => {
+    const o = nv * 3;
+    tPos[o] = x; tPos[o + 1] = y; tPos[o + 2] = z; tPath[nv] = s;
+    tPos[o + 3] = nx; tPos[o + 4] = ny; tPos[o + 5] = nz; tPath[nv + 1] = ns;
+    nv += 2;
+  };
+  const crossR = (r0, r1, R) => (r0 < R) !== (r1 < R);
+  const crossZ = (z0, z1, Z) => (z0 < Z) !== (z1 < Z);
+  const RAD = 0.3 * BFIELD;
+
+  for (const P of plist) {
+    if (trks.length >= MAXTRK || nv + 4 > MAXV) break;
+    const m = SP[P.sp].m, mT = Math.hypot(m, P.pt);
+    const eta = P.eta !== undefined ? P.eta : Math.asinh(mT * Math.sinh(P.y) / P.pt);
+    if (Math.abs(eta) > 5.0) continue;
+    const pt = P.pt, q = P.q, R = pt / RAD, sh = Math.sinh(eta), ch = Math.cosh(eta);
+    const tr = { pt, q, sp: P.sp, tag: P.tag, start: nv, count: 0, h0: nh, nh: 0 };
+    let x = vx, y = vy, z = vz, alpha = P.phi, s3 = 0, turned = 0, seg = 0, tpcL = 0;
+    const siDone = new Uint8Array(7);
+    while (seg < MAXSEG && nv + 2 <= MAXV) {
+      const r = Math.hypot(x, y);
+      const ds = Math.min(0.04, 0.13 * R, 0.004 + 0.12 * r, 0.12 / Math.max(Math.abs(sh), 0.05));
+      const da = -q * ds / R, am = alpha + da / 2;
+      const nx = x + Math.cos(am) * ds, ny = y + Math.sin(am) * ds, nz = z + sh * ds, ns = s3 + ds * ch;
+      pushSeg(x, y, z, s3, nx, ny, nz, ns); seg++;
+      const rn = Math.hypot(nx, ny), rm = (r + rn) / 2, zm = (z + nz) / 2;
+      if (rm > TPC_RPAD && rm < TPC_ROUT && Math.abs(zm) < TPC_HL) tpcL += ds * ch;
+      const at = (f) => [x + f * (nx - x), y + f * (ny - y), z + f * (nz - z), s3 + f * (ns - s3)];
+      let stop = false;
+      // silicon: MVTX (3) and INTT (4)
+      for (let l = 0; l < 7; l++) {
+        const Rl = l < 3 ? MVTX_R[l] : INTT_R[l - 3], HL = l < 3 ? MVTX_HL : INTT_HL;
+        if (!siDone[l] && crossR(r, rn, Rl)) {
+          const h = at((Rl - r) / (rn - r));
+          if (Math.abs(h[2]) < HL) { addHit(h[0], h[1], h[2], h[3], l < 3 ? 0.0016 : 0.0026, tr); if (l < 3) nSi++; else nIntt++; siDone[l] = 1; }
+        }
+      }
+      if (crossR(r, rn, TPOT_R)) {
+        const h = at((TPOT_R - r) / (rn - r)), ph = normPhi(Math.atan2(h[1], h[0]));
+        if (TPOT.some(M => Math.abs(ph - M.ph) < M.dph && Math.abs(h[2] - M.z) < M.dz)) { addHit(h[0], h[1], h[2], h[3], 0.01, tr); nTpot++; }
+      }
+      if (crossR(r, rn, EMC_R0)) {
+        const h = at((EMC_R0 - r) / (rn - r));
+        if (Math.abs(h[2]) <= EMC.zmax) {
+          if (P.sp === 3) deposit(EMC, h[0], h[1], h[2], smear(EMC, pt * ch), h[3], 0.35, 8);
+          else hadronShower(h[0], h[1], h[2], Math.hypot(pt * ch, m), h[3]);
+        }
+        stop = true;
+      }
+      for (const Z of [-MBD_Z, MBD_Z]) if (crossZ(z, nz, Z)) {
+        const h = at((Z - z) / (nz - z)), hr = Math.hypot(h[0], h[1]);
+        if (hr > MBD_R0 && hr < MBD_R1) { addHit(h[0], h[1], h[2], h[3], 0.012, tr); nMBD++; }
+      }
+      for (const Z of [-SEPD_Z, SEPD_Z]) if (crossZ(z, nz, Z)) {
+        const h = at((Z - z) / (nz - z)), hr = Math.hypot(h[0], h[1]);
+        if (hr > SEPD_R0 && hr < SEPD_R1) { addHit(h[0], h[1], h[2], h[3], 0.016, tr); nEPD++; }
+        stop = true;
+      }
+      x = nx; y = ny; z = nz; s3 = ns; alpha += da; turned += Math.abs(da);
+      if (stop || turned > 2.6 * Math.PI || Math.abs(z) > SEPD_Z + 0.1) break;
+    }
+    if (tpcL > 0.25) nTPC++;
+    tr.count = nv - tr.start;
+    maxPath = Math.max(maxPath, s3);
+    trks.push(tr);
+  }
+
+  // ---- π⁰, η → γγ straight to the EMCal; neutral hadrons straight to the calorimeter stack
+  let ng = 0;
+  const G = gBuf;
+  const toEMC = (px, py, pz) => { const pT = Math.hypot(px, py); if (pT < 1e-6) return null; const t = EMC_R0 / pT; const X = vx + px * t, Y = vy + py * t, Z = vz + pz * t; return Math.abs(Z) <= EMC.zmax ? [X, Y, Z] : null; };
+  for (const [m, E0, px0, py0, pz0, tag] of gammaSrc) {
+    for (const [E, px, py, pz] of decay2(m, E0, px0, py0, pz0)) {
+      const h = toEMC(px, py, pz); if (!h || ng >= MAXG) continue;
+      const L = Math.hypot(h[0] - vx, h[1] - vy, h[2] - vz);
+      deposit(EMC, h[0], h[1], h[2], smear(EMC, E), L, 0.35, 8);
+      const o = ng * 6;
+      G.position.set([vx, vy, vz, ...h], o);
+      G.pathT[ng * 2] = 0; G.pathT[ng * 2 + 1] = L;
+      G.gE[ng * 2] = G.gE[ng * 2 + 1] = Math.min(0.25 + 0.3 * E, 2.2) * (tag ? 1.6 : 1);
+      maxPath = Math.max(maxPath, L);
+      ng++;
+    }
+  }
+  for (const [E, px, py, pz] of neutrals) {
+    const h = toEMC(px, py, pz); if (!h) continue;
+    hadronShower(h[0], h[1], h[2], E, Math.hypot(h[0] - vx, h[1] - vy, h[2] - vz), true);
+  }
+  gGeo.setDrawRange(0, ng * 2);
+  for (const a of Object.values(gAttr)) a.needsUpdate = true;
+  const cal = buildTowers();
+  maxPath += 0.6;                                                          // HCal tower stagger
+
+  const vtx = new THREE.Vector3(vx, vy, vz);
+  jetCones.forEach((m, i) => { if (jets[i]) placeCone(m, jets[i], vtx); else m.visible = false; });
+
+  ev = { K, sys: S_, NA, NB, isPP, b, c: c * 100, npart, ncoll, eps2, psi2, v2, nucleons, su, sv, mx, my, vx, vy, vz,
+         trks, nv, nh, ng, nMBD, nEPD, nTPC, nSi, nIntt, nTpot, nMes, jets, ups, ...cal, maxPath: Math.min(maxPath, 4.5),
+         gVis: Math.min(K.gCM, 12) };
+  trkGeo.setDrawRange(0, nv);
+  uTrkOp.value = THREE.MathUtils.clamp(1.05 - nTPC / 2000, 0.3, 0.9);
+  hits.count = nh;
+  nucMesh.count = nucleons.length;
+  recolor();
+  aPos.needsUpdate = true; aPath.needsUpdate = true;
+  hT.needsUpdate = true; hits.instanceMatrix.needsUpdate = true;
+  evNo++;
+}
+
+function recolor() {
+  if (!ev) return;
+  for (const tr of ev.trks) {
+    const c = trackColor(tr, colorMode);
+    for (let i = tr.start; i < tr.start + tr.count; i++) { tCol[i * 3] = c.r; tCol[i * 3 + 1] = c.g; tCol[i * 3 + 2] = c.b; }
+    for (let i = tr.h0; i < tr.h0 + tr.nh; i++) { hC.array[i * 3] = c.r; hC.array[i * 3 + 1] = c.g; hC.array[i * 3 + 2] = c.b; }
+  }
+  aCol.needsUpdate = true; hC.needsUpdate = true;
+  legend();
+}
+
+/* ================= animation ================= */
+let simT = -1.7, paused = false, speed = 2, autoLoop = true;
+const dummy = new THREE.Object3D();
+const cLead = new THREE.Color(0x9fb2cf), cProt = new THREE.Color(0xc8b6ff), cPart = new THREE.Color(0xffb24a), cFlash = new THREE.Color(4, 2.6, 1.2);
+
+function updateNuclei(t) {
+  const rN = 0.85 * S;
+  ev.nucleons.forEach((n, i) => {
+    // A (side +1) comes from −z (South) towards North (+z), B from +z.
+    const zc = n.side * V_NUC * t, g = ev.gVis;
+    const zl = n.p[2] * S / g;
+    let sc = rN, col = n.prot ? cProt : cLead;
+    if (n.part) {
+      if (t > 0.12) sc = 0;
+      else if (t >= 0) { col = cFlash; sc = rN * 1.3; }
+      else if (t > -0.45) col = tmpC.copy(col).lerp(cPart, Math.min(1, (t + 0.45) / 0.3));
+    } else if (Math.abs(zc) > ZDC_Z) sc = 0;
+    dummy.position.set(ev.vx + n.p[0] * S, ev.vy + n.p[1] * S, ev.vz + zc + zl);
+    dummy.scale.set(sc, sc, sc * Math.min(1, 3 / g));
+    dummy.updateMatrix();
+    nucMesh.setMatrixAt(i, dummy.matrix);
+    nucMesh.setColorAt(i, col);
+  });
+  nucMesh.instanceMatrix.needsUpdate = true;
+  nucMesh.instanceColor.needsUpdate = true;
+}
+
+function updateFire(t) {
+  if (t < 0 || ev.npart < 3) { uFire.value = 0; fireGroup.visible = false; return; }
+  fireGroup.visible = true;
+  const env = THREE.MathUtils.smoothstep(t, 0, 0.06) * (1 - THREE.MathUtils.smoothstep(t, 0.45, 1.05));
+  uFire.value = env * Math.min(1, 0.35 + ev.npart / 150);
+  const ve = 0.75, f = S / S0;
+  fireGroup.position.set(ev.vx + ev.mx * S, ev.vy + ev.my * S, ev.vz);
+  fireGroup.rotation.set(0, 0, ev.psi2);
+  fire.scale.set(
+    1.6 * ev.su * S + f * ve * 0.4 * (1 + 2 * ev.v2) * t,
+    1.6 * ev.sv * S + f * ve * 0.4 * (1 - 2 * ev.v2) * t,
+    f * (0.02 + 0.5 * t));
+}
+
+const jetTxt = () => ev.jets.length ? `Leading jet p_T ≈ ${ev.jets[0].pt.toFixed(0)} GeV at η = ${ev.jets[0].eta.toFixed(2)}, recoil ≈ ${ev.jets[1].pt.toFixed(0)} GeV (x_J = ${(ev.jets[1].pt / ev.jets[0].pt).toFixed(2)})${ev.isPP ? '' : ev.jets[1].lost > 1 ? `; ~${ev.jets[1].lost.toFixed(0)} GeV quenched into soft, wide-angle particles` : ''}.`
+  : ev.ups ? `Υ(1S) p_T = ${ev.ups.pt.toFixed(1)} GeV, y = ${ev.ups.y.toFixed(2)} → e⁺e⁻ (${ev.ups.legs.map(l => l.pt.toFixed(1)).join(' + ')} GeV): E/p ≈ 1 clusters in the EMCal.` : '';
+const PHASES = [
+  [-0.15, 'Approach', () => ev.isPP
+    ? `Polarised protons, γ ≈ ${ev.K.gCM.toFixed(0)} each, bunch crossing every 106 ns. ${S < 1e-12 ? 'Protons at true size: raise Nuclei zoom to see them.' : ''}`
+    : `${ev.NA.tag} + ${ev.NB.tag}, γ ≈ ${ev.K.gCM.toFixed(0)} each (drawn at γ ≤ 12). ${S < 1e-12 ? 'Nuclei at true size: raise Nuclei zoom to see them.' : 'Participants shown amber.'}`],
+  [0.08, 'Impact', () => ev.isPP ? `Inelastic p+p, σ_inel ≈ 42 mb; vertex z = ${(ev.vz * 100).toFixed(1)} cm.` : `b = ${ev.b.toFixed(1)} fm · N_part = ${ev.npart}, N_coll = ${ev.ncoll} · vertex z = ${(ev.vz * 100).toFixed(1)} cm. Spectator neutrons continue to the ZDCs at ±18 m.`],
+  [0.32, () => ev.isPP ? 'Hard scattering' : 'QGP formation', () => ev.isPP ? (ev.jets.length ? 'A 2 → 2 parton scattering produces a back-to-back dijet.' : ev.ups ? 'A b b̄ pair binds into an Υ(1S).' : 'Soft particle production, a handful of charged tracks at mid-rapidity.')
+    : `Initial overlap eccentricity ε₂ = ${ev.eps2.toFixed(2)}. ${ev.jets.length ? 'Hard-scattered partons traverse the hot medium and lose energy.' : ev.ups ? 'Υ states probe colour screening in the QGP.' : ''}`],
+  [T0 + 0.15, () => ev.isPP ? 'Hadronisation' : 'Expansion & freeze-out', () => ev.isPP ? jetTxt() || 'Hadronisation into pions, kaons and protons.' : `Pressure gradients convert ε₂ into in-plane flow, v₂ ≈ ${ev.v2.toFixed(3)}. ${jetTxt()}`],
+  [T0 + 1.0 / V_TRK, 'Tracking', () => `Helices in B = 1.4 T: R[m] = p_T/(0.42·GeV); tracks below p_T ≈ 0.19 GeV curl up before the EMCal. ${ev.nTPC.toLocaleString()} TPC tracks; ${ev.nSi} MVTX, ${ev.nIntt} INTT, ${ev.nTpot} TPOT, ${ev.nMBD} MBD and ${ev.nEPD} sEPD hits.`],
+  [1e9, 'Calorimetry', () => `${ev.nTw.toLocaleString()} towers above ${E_THR} GeV (HCal ${2 * E_THR}): EMCal ΣE = ${ev.sumE.toFixed(0)} GeV, inner + outer HCal ΣE = ${ev.sumH.toFixed(0)} GeV. Dashed: ${ev.ng} photons from π⁰, η → γγ. ${jetTxt()}`],
+];
+let lastPhase = -1;
+function phaseUpdate(t) {
+  const i = PHASES.findIndex(p => t < p[0]);
+  if (i !== lastPhase) {
+    lastPhase = i; const nm = PHASES[i][1];
+    $('phaseName').textContent = typeof nm === 'function' ? nm() : nm; $('phaseNote').textContent = PHASES[i][2]();
+  }
+}
+
+function stats() {
+  const K = ev.K;
+  $('eyebrow').textContent = `RHIC · sPHENIX · ${ev.sys.name} · ${ev.sys.runs} · toy MC`;
+  $('beamLine').innerHTML = `√s${ev.isPP ? '' : '<sub>NN</sub>'} = ${K.rs} GeV · y<sub>beam</sub> = ±${K.yb.toFixed(2)} · B = 1.4 T`;
+  $('sEv').textContent = '#' + String(evNo).padStart(3, '0');
+  $('sCent').textContent = ev.isPP ? '—' : ev.c.toFixed(1) + '%';
+  $('sB').textContent = ev.b.toFixed(2);
+  $('sNp').textContent = ev.npart;
+  $('sNc').textContent = ev.ncoll.toLocaleString();
+  $('sNch').textContent = ev.nTPC.toLocaleString();
+  $('sEps').textContent = ev.isPP ? '—' : ev.eps2.toFixed(3);
+  $('sV2').textContent = ev.isPP ? '—' : ev.v2.toFixed(3);
+  if (ev.jets.length) { $('sProbeT').textContent = 'Jets p_T (GeV)'; $('sProbe').textContent = `${ev.jets[0].pt.toFixed(0)} / ${ev.jets[1].pt.toFixed(0)}`; }
+  else if (ev.ups) { $('sProbeT').textContent = 'Υ p_T (GeV)'; $('sProbe').textContent = ev.ups.pt.toFixed(1); }
+  else { $('sProbeT').textContent = 'Probe'; $('sProbe').textContent = '—'; }
+  $('sTw').textContent = ev.nTw.toLocaleString();
+  $('sSE').textContent = ev.sumE.toFixed(0);
+  $('sSH').textContent = ev.sumH.toFixed(0);
+  $('sSi').textContent = `${ev.nSi} / ${ev.nIntt}`;
+  $('sHits').textContent = `${ev.nMBD} / ${ev.nEPD}`;
+  $('sTpot').textContent = ev.nTpot;
+}
+
+function newEvent() {
+  generate(+$('iCent').value);
+  simT = -1.7; lastPhase = -1; stats();
+}
+function replay() { simT = -1.7; lastPhase = -1; }
+
+/* ---------------- legend ---------------- */
+function legend() {
+  const el = $('legend'), hx = c => '#' + c.getHexString(THREE.SRGBColorSpace);
+  if (colorMode === 'pt') {
+    el.innerHTML = `<h2>Track p<sub>T</sub> (GeV/c)</h2>
+      <div class="ramp" style="background:linear-gradient(90deg,${PT_COLS.map(hx).join(',')})"></div>
+      <div class="ticks">${PT_STOPS.map((p, i) => `<span style="left:${i * 25}%">${i === 4 ? '≥4' : p}</span>`).join('')}</div>`;
+  } else if (colorMode === 'charge') {
+    el.innerHTML = `<h2>Track charge</h2><div class="keys">
+      <span class="key"><i style="background:#ff7a59"></i>positive</span>
+      <span class="key"><i style="background:#4fa3ff"></i>negative</span></div>`;
+  } else if (colorMode === 'probe') {
+    el.innerHTML = `<h2>Track origin (MC truth)</h2><div class="keys">
+      <span class="key"><i style="background:${hx(PR_COLS.jet)}"></i>jet</span>
+      <span class="key"><i style="background:${hx(PR_COLS.ups)}"></i>Υ → e⁺e⁻</span>
+      <span class="key muted"><i style="background:${hx(PR_COLS.bulk)}"></i>bulk</span></div>`;
+  } else {
+    el.innerHTML = `<h2>Species (MC truth)</h2><div class="keys">${SP.map(s => `<span class="key"><i style="background:${hx(s.col)}"></i>${s.name}</span>`).join('')}</div>`;
+  }
+  const lg = v => (Math.log10(v / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]) * 100).toFixed(1);
+  el.insertAdjacentHTML('beforeend', `<h2 class="sub">EMCal / iHCal / oHCal tower E (GeV)</h2>
+    <div class="ramp" style="background:linear-gradient(90deg,${E_COLS.map(hx).join(',')})"></div>
+    <div class="ticks">${[0.1, 1, 10, 20].map(v => `<span style="left:${lg(v)}%">${v}</span>`).join('')}</div>
+    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key"><i class="cone"></i>jet, R = 0.4</span><span class="key muted">height ∝ log E · HCal threshold 2×</span></div>`);
+}
+
+/* ---------------- labels ---------------- */
+const mkLabel = (n, sub, p, cls = '') => {
+  const d = document.createElement('div'); d.className = 'lbl ' + cls;
+  d.innerHTML = `<b>${n}</b>${sub ? ' · ' + sub : ''}`;
+  $('labels').appendChild(d);
+  return { d, v: new THREE.Vector3(...p) };
+};
+const P = (r, phd, z) => [r * Math.cos(phd * D2R), r * Math.sin(phd * D2R), z];
+const LABELS = [
+  ['MVTX', 'MAPS', P(0.04, 90, MVTX_HL), 'inner'],
+  ['INTT', 'Si strips', P(0.10, 60, -INTT_HL), 'inner'],
+  ['TPC', 'r 0.2–0.78 m', [0, TPC_ROUT, -TPC_HL]],
+  ['TPOT', 'Micromegas', P(TPOT_R, 270, 0.9)],
+  ['EMCal', 'W/SciFi', P(EMC_R1, 150, 0.7)],
+  ['iHCal', '', P(IH_R1, 30, -1.0)],
+  ['Magnet', '1.4 T solenoid', [0, CRY_R1, MAG_HL]],
+  ['oHCal', 'flux return', P(OH_R1, 120, 1.6)],
+  ['MBD', 'South', [0, MBD_R1 + 0.02, -MBD_Z]],
+  ['MBD', 'North', [0, MBD_R1 + 0.02, MBD_Z]],
+  ['sEPD', 'North', P(SEPD_R1, 60, SEPD_Z)],
+  ['sEPD', 'South', P(SEPD_R1, 60, -SEPD_Z)],
+  ['ZDC', '+18 m', [0, 0.12, ZDC_Z]],
+  ['ZDC', '−18 m', [0, 0.12, -ZDC_Z]],
+  ['North', '+z', [0, 0, 7]],
+  ['South', '−z', [0, 0, -7]],
+].map(([n, sub, p, k]) => ({ ...mkLabel(n, sub, p), inner: k === 'inner' }));
+const NUCL = [1, -1].map(side => ({ ...mkLabel('', '', [0, 0, 0], 'pb'), side }));
+const pv = new THREE.Vector3();
+function placeLabels() {
+  const w = innerWidth, h = innerHeight, camD = camera.position.distanceTo(controls.target);
+  for (const L of NUCL) {
+    const N = L.side === 1 ? ev.NA : ev.NB;
+    L.d.innerHTML = `<b>${N.tag}</b>`;
+    L.v.set(ev.vx, ev.vy + 0.03 + 7 * S, ev.vz + L.side * V_NUC * simT);
+  }
+  for (const L of [...LABELS, ...NUCL]) {
+    if (L.side && simT > 0) { L.d.hidden = true; continue; }
+    if (L.inner && camD > 6) { L.d.hidden = true; continue; }        // inner-tracker labels only when zoomed in
+    pv.copy(L.v).project(camera);
+    const vis = pv.z < 1 && Math.abs(pv.x) < 1.05 && Math.abs(pv.y) < 1.05;
+    L.d.hidden = !vis;
+    if (vis) L.d.style.transform = `translate(${(pv.x * 0.5 + 0.5) * w}px,${(-pv.y * 0.5 + 0.5) * h}px) translate(-50%,-100%)`;
+  }
+}
+
+/* ---------------- camera presets ---------------- */
+const VIEWS = {
+  v3d: [[6.6, 4.0, 8.4], [0, 0, 0.3]], vBeam: [[0.001, 0.001, 10.5], [0, 0, 0]],
+  vSide: [[12.5, 0.6, 0.5], [0, 0, 0.5]], vIn: [[1.0, 0.65, 1.25], [0, 0, 0]], vFwd: [[-2.8, 1.6, 0.8], [0, 0, 2.4]],
+};
+let tween = null;
+function setView(id, instant) {
+  const k = innerWidth / innerHeight < 1 ? 1.55 : 1;
+  const [pos, tgt] = VIEWS[id];
+  const to = new THREE.Vector3(...pos).multiplyScalar(k), tt = new THREE.Vector3(...tgt);
+  for (const b of Object.keys(VIEWS)) $(b).setAttribute('aria-pressed', b === id);
+  if (instant) { camera.position.copy(to); controls.target.copy(tt); return; }
+  tween = { from: camera.position.clone(), to, t: 0, tf: controls.target.clone(), tt };
+}
+
+/* ---------------- UI wiring ---------------- */
+$('iSys').innerHTML = Object.entries(SYSTEMS).map(([k, s]) => `<option value="${k}">${s.name} · ${s.rs} GeV · ${s.runs}</option>`).join('');
+function sysChanged() {
+  const pp = SYSTEMS[sysKey].A === 'p';
+  $('iCent').disabled = pp; $('gCent').style.opacity = pp ? 0.45 : 1;
+}
+$('iSys').onchange = e => { sysKey = e.target.value; sysChanged(); newEvent(); };
+$('iProbe').onchange = e => { probe = e.target.value; newEvent(); };
+
+$('hudToggle').onclick = () => { const c = $('hud').classList.toggle('collapsed'); $('hudToggle').setAttribute('aria-expanded', !c); };
+$('bNext').onclick = newEvent;
+$('ctlToggle').onclick = () => { const c = $('controls').classList.toggle('collapsed'); $('ctlToggle').setAttribute('aria-expanded', !c); };
+
+let lightTheme = false;
+function applyTheme(light) {
+  lightTheme = light;
+  document.documentElement.classList.toggle('light', light);
+  $('cLight').checked = light;
+  const bg = light ? 0xeef1f6 : 0x060a13;
+  renderer.setClearColor(bg, 1); scene.fog.color.setHex(bg);
+  uLight.value = light ? 1 : 0;
+  for (const m of themed) { m.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; m.needsUpdate = true; }
+  for (const m of lineMats) {
+    m.color.copy(m.userData.base.color).multiplyScalar(light ? 0.55 : 1);
+    m.opacity = Math.min(1, m.userData.base.opacity * (light ? 1.7 : 1));
+  }
+}
+$('cLight').onchange = e => applyTheme(e.target.checked);
+$('bReplay').onclick = replay;
+$('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? 'Play' : 'Pause'; $('bPause').setAttribute('aria-pressed', paused); };
+$('iCent').oninput = e => { $('oCent').textContent = `${e.target.value}–${+e.target.value + 5}%`; };
+$('iCent').onchange = newEvent;
+$('iColor').onchange = e => { colorMode = e.target.value; recolor(); };
+$('iThr').onchange = e => { E_THR = +e.target.value; Object.assign(ev, buildTowers()); stats(); lastPhase = -1; };
+$('iSpeed').oninput = e => { speed = +e.target.value; $('oSpeed').textContent = speed.toFixed(1) + '×'; };
+$('cDet').onchange = e => { det.visible = e.target.checked; };
+$('cJet').onchange = e => { showJets = e.target.checked; jetG.visible = showJets; };
+$('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
+$('cLoop').onchange = e => { autoLoop = e.target.checked; };
+$('cRot').onchange = e => { controls.autoRotate = e.target.checked; };
+const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+function fmtLen(m) {
+  const U = [[1, 'm'], [1e-2, 'cm'], [1e-3, 'mm'], [1e-6, 'µm'], [1e-9, 'nm'], [1e-12, 'pm'], [1e-15, 'fm']];
+  const [s, u] = U.find(([s]) => m >= s * 0.999) || U[U.length - 1];
+  const v = m / s;
+  return `${v < 10 ? v.toFixed(1) : v.toFixed(0)} ${u}`;
+}
+function setZoom(lg) {
+  const m = 10 ** lg;
+  S = m * 1e-15;
+  const e = Math.floor(lg + 1e-9), mant = m / 10 ** e;
+  const mag = m < 1.05 ? '1× (true size)' : e < 1 ? `${m.toFixed(1)}×` : `${mant.toFixed(1)}×10${String(e).split('').map(c => SUP[c]).join('')}`;
+  $('oZoom').textContent = `${mag} · R_Au ${fmtLen(7.0e-15 * m)}`;
+}
+$('iZoom').max = Math.log10(MAG0).toFixed(2);
+$('iZoom').oninput = e => setZoom(+e.target.value);
+setZoom(+$('iZoom').value);
+for (const id of Object.keys(VIEWS)) $(id).onclick = () => setView(id);
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); $('bPause').click(); }
+  if (e.key === 'n') newEvent();
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+// URL parameters (links / tests): ?sys=pp&probe=ups&cent=0&color=probe&zoom=13&view=vIn&t=6
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('sys') && SYSTEMS[q.get('sys')]) { sysKey = q.get('sys'); $('iSys').value = sysKey; }
+  if (q.has('probe') && ['dijet', 'ups', 'none'].includes(q.get('probe'))) { probe = q.get('probe'); $('iProbe').value = probe; }
+  if (q.has('cent')) { $('iCent').value = q.get('cent'); $('iCent').dispatchEvent(new Event('input')); }
+  if (q.has('color')) { colorMode = q.get('color'); $('iColor').value = colorMode; }
+  if (q.has('zoom')) { $('iZoom').value = q.get('zoom'); setZoom(+$('iZoom').value); }
+  if (q.has('t')) { paused = true; autoLoop = false; controls.autoRotate = false; window.__fixT = +q.get('t'); }
+  if (q.has('view') && VIEWS[q.get('view')]) window.__view = q.get('view');
+}
+sysChanged();
+
+/* ---------------- go ---------------- */
+setView(window.__view || 'v3d', true);
+newEvent();
+if (window.__fixT !== undefined) simT = window.__fixT;
+const clock = new THREE.Clock();
+let shotReq = null;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!paused) simT += dt * speed;
+  updateNuclei(simT);
+  updateFire(simT);
+  uT.value = Math.max(0, simT - T0) * V_TRK;
+  uJet.value = ev.jets.length ? THREE.MathUtils.smoothstep(uT.value, 1.0, 2.0) : 0;
+  phaseUpdate(simT);
+  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 0.9);
+    const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
+    camera.position.lerpVectors(tween.from, tween.to, e);
+    controls.target.lerpVectors(tween.tf, tween.tt, e);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+  if (!$('labels').hidden) placeLabels();
+  if (post && !lightTheme) post.render(); else renderer.render(scene, camera);
+  if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
+});
+window.__ready = true;
+
+/* ---------------- screenshot ---------------- */
+let downloads = null;
+const inViewer = typeof window.claude?.use === 'function';
+$('bShot').hidden = false;
+if (inViewer) (async () => { try { downloads = await window.claude.use('downloads'); } catch (e) { downloads = null; } })();
+function saveLocally(blob, filename) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function composeShot(done) {
+  const src = renderer.domElement, c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const k = c.width / innerWidth, pad = 18 * k;
+  g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue('--ink').trim(); g.textBaseline = 'bottom';
+  g.fillText(`sPHENIX · ${ev.sys.name} √s${ev.isPP ? '' : 'NN'} = ${ev.K.rs} GeV · toy MC`, pad, c.height - pad - 18 * k);
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = css.getPropertyValue('--muted').trim();
+  const pr = ev.jets.length ? ` · dijet ${ev.jets[0].pt.toFixed(0)}/${ev.jets[1].pt.toFixed(0)} GeV` : ev.ups ? ` · Υ(1S) p_T ${ev.ups.pt.toFixed(1)} GeV` : '';
+  g.fillText(`Event #${String(evNo).padStart(3, '0')}${ev.isPP ? '' : ` · centrality ${ev.c.toFixed(1)}% · Npart ${ev.npart}`} · ${ev.nTPC} TPC tracks · EMCal ${ev.sumE.toFixed(0)} GeV, HCal ${ev.sumH.toFixed(0)} GeV${pr}`, pad, c.height - pad);
+  c.toBlob(done, 'image/png');
+}
+$('bShot').onclick = () => {
+  const b = $('bShot');
+  shotReq = async blob => {
+    if (!blob) { b.textContent = 'Screenshot failed'; return; }
+    const filename = `sphenix-${sysKey}-${probe}-event-${String(evNo).padStart(3, '0')}.png`;
+    if (!downloads) {
+      if (inViewer) { b.textContent = 'Save unavailable'; setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return; }
+      saveLocally(blob, filename); b.textContent = 'Saved';
+      setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return;
+    }
+    try { await downloads.save({ filename, data: blob }); b.textContent = 'Saved'; }
+    catch (e) {
+      b.textContent = e?.code === 'declined' ? 'Save screenshot' : 'Save unavailable';
+      if (['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e?.code)) b.hidden = true;
+    }
+    setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800);
+  };
+};
+
+function fail(msg) {
+  const d = document.createElement('div'); d.id = 'fail'; d.textContent = msg; app.prepend(d);
+  $('phaseName').textContent = 'Renderer unavailable'; $('phaseNote').textContent = msg;
+}
+</script>
+
+</body>
+</html>
