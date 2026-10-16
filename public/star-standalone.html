@@ -1,0 +1,1455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>STAR Event Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGPU event display; glass HUD top-left, legend top-right, control rail at the bottom. Deliberately single dark theme (event-display convention). */
+:root{
+  color-scheme: dark;
+  --void:#060a13;
+  --panel:rgba(9,15,28,.74);
+  --ink:#dfe6f3;
+  --muted:#8796b1;
+  --line:rgba(140,165,205,.20);
+  --amber:#ffb24a;
+  --steel:#6f8db8;
+  --btn:rgba(120,150,200,.10);
+  --on-accent:#1a1205;
+  --gamma:#fff0b8;
+  --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+/* Light theme: toggled by the page's own button (class on <html>), independent of the host theme */
+html.light{
+  color-scheme: light;
+  --void:#eef1f6;
+  --panel:rgba(252,253,255,.84);
+  --ink:#172033;
+  --muted:#56637c;
+  --line:rgba(40,60,100,.20);
+  --amber:#b86400;
+  --steel:#41618f;
+  --btn:rgba(40,70,120,.07);
+  --on-accent:#ffffff;
+  --gamma:#9a6a00;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:12px}
+#app{position:fixed;inset:0}
+#app canvas{display:block;width:100%;height:100%;touch-action:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.lbl b{color:var(--ink);font-weight:500}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#hud{top:calc(16px + env(safe-area-inset-top,0px));left:16px;width:min(330px,calc(100% - 32px));padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.eyebrow{font:500 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--amber)}
+h1{margin:0;font:600 30px/1 var(--display);letter-spacing:.01em;text-wrap:balance}
+#hudToggle{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;border-radius:3px}
+#hudToggle:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.chev{font-size:16px;color:var(--muted);transition:transform .2s}
+#hud.collapsed .chev{transform:rotate(-90deg)}
+.hud-body{display:flex;flex-direction:column;gap:10px}
+#hud.collapsed .hud-body,#hud.collapsed details{display:none}
+.beam{color:var(--muted);font-size:11px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;margin:0}
+.stats div{min-width:0}
+.stats dt{font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.stats dd{margin:2px 0 0;font:600 19px/1.1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.phase{border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:3px}
+#phaseName{font:600 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+#phaseNote{color:var(--muted);font-size:11px;line-height:1.45}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;color:var(--muted);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+summary:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+details p,details li{color:var(--muted);font-size:10.5px;line-height:1.5;margin:6px 0 0}
+details ul{margin:4px 0 0;padding-left:16px}
+details i{color:var(--ink);font-style:normal}
+#legend{top:calc(16px + env(safe-area-inset-top,0px));right:16px;padding:10px 12px;width:210px}
+#legend h2{margin:0 0 8px;font:500 10.5px/1.2 var(--mono);letter-spacing:.03em;color:var(--muted)}
+.ramp{height:8px;border-radius:2px}
+.ticks{position:relative;height:14px;margin-top:4px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.ticks span:first-child{transform:none}
+.ticks span:last-child{transform:translateX(-100%)}
+.keys{display:flex;flex-wrap:wrap;gap:6px 12px}
+.key{display:flex;align-items:center;gap:6px}
+.key i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.key i.dash{background:repeating-linear-gradient(90deg,var(--gamma) 0 3px,transparent 3px 6px)}
+.key.muted{color:var(--muted)}
+#legend h2.sub{margin-top:12px}
+#legend .keys{margin-top:6px}
+details a{color:var(--ink)}
+.lbl.pb{color:var(--amber);border-bottom-color:var(--amber)}
+.zoom output{min-width:19ch}
+#controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#controls.collapsed{right:auto;max-width:calc(100% - 32px)}
+.ctl-bar,.ctl-body{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.ctl-bar{gap:6px 8px}
+.ctl-bar label.chk{margin-left:6px}
+#controls.collapsed .ctl-body{display:none}
+#ctlToggle .chev{font-size:12px;margin-left:4px;display:inline-block;transition:transform .2s}
+#controls.collapsed #ctlToggle .chev{transform:rotate(180deg)}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grp>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--steel)}
+button.primary{background:var(--amber);color:var(--on-accent);border-color:var(--amber);font-weight:600}
+button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+input[type=range]{accent-color:var(--amber);width:120px}
+output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
+label.chk{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--ink)}
+input[type=checkbox]{accent-color:var(--amber)}
+#fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-inline:16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+@media (max-width:720px){
+  #legend{display:none}
+  #hud{padding:10px 12px;gap:7px}
+  h1{font-size:22px}
+  .stats dd{font-size:16px}
+  .hide-sm{display:none}
+  #controls,.ctl-body{gap:8px 12px}
+  input[type=range]{width:96px}
+}
+@media (max-height:620px){ details{display:none} }
+</style>
+<style>
+#controls select{max-width:100%}
+.lbl.tgt{color:var(--amber);border-bottom-color:var(--amber)}
+</style>
+
+<div id="app">
+  <div id="labels"></div>
+
+  <section class="panel collapsed" id="hud" aria-label="Event summary">
+    <div class="eyebrow" id="eyebrow">RHIC · STAR · toy MC</div>
+    <h1><button id="hudToggle" type="button" aria-expanded="false" aria-controls="hudBody">STAR Event Display<span class="chev" aria-hidden="true">▾</span></button></h1>
+    <div id="hudBody" class="hud-body">
+    <div class="beam" id="beamLine">—</div>
+    <dl class="stats">
+      <div><dt>Event</dt><dd id="sEv">—</dd></div>
+      <div><dt>Centrality</dt><dd id="sCent">—</dd></div>
+      <div><dt>b (fm)</dt><dd id="sB">—</dd></div>
+      <div><dt>N<sub>part</sub></dt><dd id="sNp">—</dd></div>
+      <div><dt>N<sub>coll</sub></dt><dd id="sNc">—</dd></div>
+      <div><dt>N<sub>ch</sub> in TPC</dt><dd id="sNch">—</dd></div>
+      <div class="hide-sm"><dt>ε₂</dt><dd id="sEps">—</dd></div>
+      <div class="hide-sm"><dt>v₂ (input)</dt><dd id="sV2">—</dd></div>
+      <div class="hide-sm"><dt>p in TPC</dt><dd id="sNp2">—</dd></div>
+      <div><dt>Towers &gt;0.1 GeV</dt><dd id="sTw">—</dd></div>
+      <div><dt>ΣE cal (GeV)</dt><dd id="sSE">—</dd></div>
+      <div class="hide-sm"><dt>TOF / EPD hits</dt><dd id="sHits">—</dd></div>
+    </dl>
+    </div>
+    <div class="phase" aria-live="polite">
+      <span id="phaseName">Loading</span>
+      <span id="phaseNote">Initialising the renderer…</span>
+    </div>
+    <details>
+      <summary>Model &amp; references</summary>
+      <ul>
+        <li><i>Detector</i> (final RHIC configuration, Runs 22–25; STAR coordinates, +z = West): TPC r 0.5–2.0 m, |z| &lt; 2.1 m, 12 sectors per side, inner sectors upgraded (iTPC), |η| &lt; 1.5 (Anderson et al., NIM A 499, 659, 2003; iTPC TDR, STAR Note SN0644). TOF 120 trays at r ≈ 2.16 m, |η| &lt; 0.9. BEMC 4800 towers, Δη×Δφ = 0.05×0.05, r 2.23–2.63 m, |η| &lt; 1, σ<sub>E</sub>/E ≈ 14%/√E ⊕ 1.5% (Beddo et al., NIM A 499, 725, 2003). EEMC 720 towers, 1.086 &lt; η &lt; 2, z = 2.7 m (Allgower et al., NIM A 499, 740, 2003). MTD on the return-yoke backlegs, |η| &lt; 0.5. Solenoid 0.5 T, coil r ≈ 2.64–2.93 m, 30 flux-return bars to r = 3.66 m, length 6.85 m (Bergsma et al., NIM A 499, 633, 2003; Ackermann et al., NIM A 499, 624, 2003).</li>
+        <li><i>Forward</i>: EPD at |z| = 3.75 m, 2.14 &lt; |η| &lt; 5.09, 12 supersectors × 16 rows (Adams et al., NIM A 968, 163970, 2020). Forward upgrade (West, 2.5 &lt; η &lt; 4): FST (3 Si disks), FTT (4 sTGC stations), FCS ECal + HCal at z ≈ 7 m (STAR Forward Upgrade, STAR Note SN0648). VPD at |z| = 5.7 m; ZDCs at ±18 m. eTOF (East, −1.6 &lt; η &lt; −1.1; CBM–STAR, arXiv:1609.05102) is optional. Dimensions are approximate (published values), not the GEANT geometry.</li>
+        <li><i>Fixed target</i>: 0.25 mm Au foil at z = 200.7 cm, 2 cm below the beam axis; beam travels West→East, so the fireball is boosted by y<sub>CM</sub> into the TPC (STAR BES-II/FXT, STAR Note SN0598; STAR, PRC 103, 034908, 2021).</li>
+        <li><i>Glauber MC</i>: Woods–Saxon Au (R = 6.38, a = 0.535 fm), Cu (4.20, 0.596), Ru (5.085, 0.46), Zr (5.02, 0.52), O (2.608, 0.513); Hulthén deuteron; σ<sub>NN</sub><sup>inel</sup>(√s) from 22 mb (3 GeV) to 42 mb (200 GeV) (Miller et al., Ann. Rev. Nucl. Part. Sci. 57, 205, 2007).</li>
+        <li><i>Particles</i>: two-component dN/dη of mesons, n<sub>pp</sub>(√s) tuned to ≈ 690 for 0–5% Au+Au at 200 GeV (PHOBOS, PRC 83, 024913, 2011), Gaussian dN/dy with Landau width σ² = ln(√s/2m<sub>p</sub>). Participant protons with rapidity loss ≈ 2 units (full stopping at BES energies; STAR, PRC 96, 044904, 2017), light-nucleus (d) coalescence at low √s, K⁻/K⁺ and p̄/p rising with √s. v₂ from ε₂ with sign change below ≈ 4 GeV and proton v₁ slope at FXT energies (STAR, PLB 827, 137003, 2022).</li>
+        <li><i>Tracking</i>: helices in B = 0.5 T inside the magnet, straight beyond. Hits: TOF, eTOF, FST, FTT, EPD, VPD. Towers: BEMC, EEMC, FCS ECal (charged MIP / partial showers, γ from π⁰, η → γγ).</li>
+      </ul>
+    </details>
+  </section>
+
+  <aside class="panel" id="legend" aria-label="Colour legend"></aside>
+
+  <section class="panel collapsed" id="controls" aria-label="Controls">
+    <div class="ctl-bar">
+      <button id="ctlToggle" type="button" aria-expanded="false" aria-controls="ctlBody">Controls<span class="chev" aria-hidden="true">▾</span></button>
+      <button id="bNext" class="primary">New event</button>
+      <button id="bReplay">Replay</button>
+      <button id="bPause" aria-pressed="false">Pause</button>
+      <button id="bShot" hidden>Save screenshot</button>
+      <label class="chk"><input id="cLight" type="checkbox">Light background</label>
+    </div>
+    <div class="ctl-body" id="ctlBody">
+    <div class="grp">
+      <span>System</span>
+      <select id="iSys" aria-label="Collision system"></select>
+      <select id="iE" aria-label="Collision energy"></select>
+    </div>
+    <div class="grp">
+      <span>Centrality</span>
+      <input id="iCent" type="range" min="0" max="80" step="5" value="10" aria-label="Centrality percent">
+      <output id="oCent">10–15%</output>
+    </div>
+    <div class="grp">
+      <span>Colour</span>
+      <select id="iColor" aria-label="Track colour mode">
+        <option value="pt">pT</option>
+        <option value="charge">Charge</option>
+        <option value="species">Species</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>View</span>
+      <button id="v3d" aria-pressed="true">3D</button>
+      <button id="vBeam" aria-pressed="false">Beam axis</button>
+      <button id="vSide" aria-pressed="false">Side</button>
+      <button id="vFwd" aria-pressed="false">Forward</button>
+    </div>
+    <div class="grp zoom">
+      <span>Nuclei zoom</span>
+      <input id="iZoom" type="range" min="0" max="13.66" step="0.01" value="0" aria-label="Nuclei magnification, log10 scale">
+      <output id="oZoom">1× (true size)</output>
+    </div>
+    <div class="grp">
+      <span>Speed</span>
+      <input id="iSpeed" type="range" min="0.2" max="10" step="0.1" value="3" aria-label="Playback speed">
+      <output id="oSpeed">3.0×</output>
+    </div>
+    <div class="grp">
+      <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cEtof" type="checkbox" checked>eTOF</label>
+      <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
+      <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
+      <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
+    </div>
+  </section>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.tsl.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three/webgpu';
+import { uniform, attribute, float, vec3, color, mix, step, smoothstep, exp, abs, dot, fract, fwidth, min, max,
+         positionLocal, normalView, positionViewDirection, mx_noise_float, time, pass } from 'three/tsl';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+/* ================= STAR geometry (metres; STAR frame: +z = West, +y = up) =================
+   Published dimensions (NIM A 499 (2003) STAR issue; EPD NIM A 968 (2020); Forward Upgrade SN0648; eTOF arXiv:1609.05102).
+   Approximate at the few-cm level: good for an event display, not for physics. */
+const D2R = Math.PI / 180;
+const BFIELD = 0.5;                                   // T, full field (also used for BES)
+const MP = 0.9383;
+const BP_R = 0.0198, ZBEAM = 20;                      // Be beam pipe, drawn beam line ±20 m
+const TPC_RIN = 0.50, TPC_ROUT = 2.00, TPC_HL = 2.10, ITPC_R = 1.22;   // inner (iTPC) / outer sector boundary
+const TOF_R = 2.16, TOF_HL = 2.42;                    // 120 trays (60 per half), |η| < 0.9
+const BEMC_R = 2.23, BEMC_R2 = 2.63, BEMC_ZF = BEMC_R * Math.sinh(1);
+const COIL_R0 = 2.64, COIL_R1 = 2.93, MAG_HL = 3.425; // solenoid: 6.85 m long
+const BL_R0 = 2.97, BL_R1 = 3.66, NBL = 30;           // flux-return bars ("backlegs")
+const PT_Z0 = 3.00, PT_Z1 = 3.70, PT_RIN = 0.70, PT_ROUT = 2.62;       // pole tips
+const ER_Z0 = 3.425, ER_Z1 = 3.73;                    // end rings r COIL_R0..BL_R1
+const EEMC_Z0 = 2.70, EEMC_Z1 = 3.00, EEMC_E0 = 1.086, EEMC_E1 = 2.0;
+const EEMC_RIN = EEMC_Z0 / Math.sinh(EEMC_E1), EEMC_ROUT = EEMC_Z0 / Math.sinh(EEMC_E0);
+const ETOF_Z0 = -2.75, ETOF_Z1 = -2.83, ETOF_RIN = 2.75 / Math.sinh(1.6), ETOF_ROUT = 2.75 / Math.sinh(1.1);
+const EPD_Z = 3.75, EPD_R0 = 0.046, EPD_R1 = 0.895;
+const FST_Z = [1.51, 1.65, 1.79], FST_R0 = 0.05, FST_R1 = 0.28;
+const FTT_Z = [2.81, 3.01, 3.21, 3.40], FTT_H = 0.60, FTT_HOLE = 0.06;
+const VPD_Z = 5.70, VPD_R0 = 0.065, VPD_R1 = 0.165;
+const FCS_Z = 7.00, FCS_D = 0.60, FCS_X0 = 0.17, FCS_C = 0.0553, FCS_NC = 22, FCS_NR = 34;
+const HCAL_Z = 7.80, HCAL_D = 0.84, HCAL_X0 = 0.19, HCAL_C = 0.10, HCAL_NC = 13, HCAL_NR = 20;
+const MTD_R = 4.03;
+const ZDC_Z = 18.0;
+const FXT_Z = 2.007, FXT_Y = -0.02;
+
+/* animation constants */
+const V_NUC = 1.6, T0 = 0.55, V_TRK = 2.8;
+const MAXTRK = 6500, MAXSEG = 90, MAXV = MAXTRK * MAXSEG * 2, MAXH = MAXTRK * 5, MAXG = 9000;
+const normPhi = p => ((p % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+
+/* ================= collision systems ================= */
+const NUCLEI = {
+  Au: { A: 197, Z: 79, R: 6.38, a: 0.535, tag: '¹⁹⁷Au' },
+  Cu: { A: 63, Z: 29, R: 4.20, a: 0.596, tag: '⁶³Cu' },
+  Ru: { A: 96, Z: 44, R: 5.085, a: 0.46, tag: '⁹⁶Ru' },
+  Zr: { A: 96, Z: 40, R: 5.02, a: 0.52, tag: '⁹⁶Zr' },
+  O:  { A: 16, Z: 8, R: 2.608, a: 0.513, tag: '¹⁶O' },
+  d:  { A: 2, Z: 1, R: 1.5, tag: 'd' },
+  p:  { A: 1, Z: 1, R: 0.5, tag: 'p' },
+};
+// [√sNN (GeV), note]
+const SYSTEMS = {
+  AuAu:  { A: 'Au', B: 'Au', name: 'Au+Au', E: [[200, 'Runs 23 · 25'], [62.4, 'BES-I 2010'], [39, 'BES-I 2010'], [27, 'BES-I 2011 · BES-II 2018'], [19.6, 'BES-I 2011 · BES-II 2019'], [17.3, 'BES-II 2021'], [14.6, 'BES-II 2019'], [14.5, 'BES-I 2014'], [11.5, 'BES-I 2010 · BES-II 2020'], [9.2, 'BES-II 2020'], [7.7, 'BES-I 2010 · BES-II 2021']] },
+  AuAuFXT: { A: 'Au', B: 'Au', name: 'Au+Au FXT', fxt: true, E: [13.7, 11.5, 9.2, 7.7, 7.2, 6.2, 5.2, 4.5, 3.9, 3.5, 3.2, 3.0].map(e => [e, '']) },
+  OO:    { A: 'O', B: 'O', name: 'O+O', E: [[200, 'Run 21']] },
+  CuCu:  { A: 'Cu', B: 'Cu', name: 'Cu+Cu', E: [[200, 'Run 5'], [62.4, 'Run 5'], [22.4, 'Run 5']] },
+  RuRu:  { A: 'Ru', B: 'Ru', name: 'Ru+Ru (isobar)', E: [[200, 'Run 18']] },
+  ZrZr:  { A: 'Zr', B: 'Zr', name: 'Zr+Zr (isobar)', E: [[200, 'Run 18']] },
+  dAu:   { A: 'd', B: 'Au', name: 'd+Au', E: [[200, 'Runs 3 · 8 · 16'], [62.4, 'Run 16'], [39, 'Run 16'], [19.6, 'Run 16']] },
+  pAu:   { A: 'p', B: 'Au', name: 'p+Au', E: [[200, 'Runs 15 · 24']] },
+  pp:    { A: 'p', B: 'p', name: 'p+p', E: [[200, 'Runs 12 · 15 · 24'], [510, 'Runs 13 · 17 · 22']] },
+};
+const fxtElab = rs => (rs * rs - 2 * MP * MP) / (2 * MP);          // total energy per nucleon of the beam (GeV)
+const yBeamCM = rs => Math.acosh(rs / (2 * MP));
+function lerpLog(tab, rs) {                                           // piecewise-linear in ln √s
+  const x = Math.log(rs);
+  if (rs <= tab[0][0]) return tab[0][1];
+  for (let i = 1; i < tab.length; i++) if (rs <= tab[i][0]) {
+    const x0 = Math.log(tab[i - 1][0]), x1 = Math.log(tab[i][0]);
+    return tab[i - 1][1] + (tab[i][1] - tab[i - 1][1]) * (x - x0) / (x1 - x0);
+  }
+  return tab[tab.length - 1][1];
+}
+const SIG_NN = [[3, 22], [4.5, 26], [7.7, 30.8], [19.6, 32.5], [39, 34], [62.4, 36], [200, 42], [510, 48]];   // mb
+const K_V2 = [[3, -0.12], [3.5, -0.06], [4.5, 0.02], [7.7, 0.13], [19.6, 0.17], [200, 0.21], [510, 0.22]];
+const V1_P = [[3, 0.40], [3.9, 0.25], [4.5, 0.15], [7.7, 0.02], [11.5, 0], [510, 0]];
+const clamp01 = x => Math.min(1, Math.max(0, x));
+
+/* nuclei magnification (slider): 1 = true size */
+const S0 = 0.3 / 6.38, MAG0 = S0 / 1e-15;
+let S = 1e-15;
+
+/* ---------------- renderer ---------------- */
+let renderer;
+try {
+  renderer = new THREE.WebGPURenderer({ antialias: true });
+  await renderer.init();
+} catch (e) { fail('Could not start a WebGPU or WebGL2 renderer in this browser.'); throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x060a13, 1);
+app.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x060a13, 30, 56);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.4; controls.maxDistance = 45;
+controls.autoRotateSpeed = 0.6; controls.autoRotate = true;
+
+scene.add(new THREE.HemisphereLight(0xbfd2ff, 0x1a1408, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, 4); scene.add(sun);
+
+/* ---------------- uniforms ---------------- */
+const uT = uniform(0);
+const uDet = uniform(1);
+const uFire = uniform(0);
+const uLight = uniform(0);
+const themed = [];
+
+/* ---------------- detector ---------------- */
+const det = new THREE.Group(); scene.add(det);
+const etofG = new THREE.Group(); det.add(etofG);
+
+function shellMat(hex, rim, base) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = f.mul(rim).add(base).mul(uDet).mul(mix(float(1), float(1.6), uLight));
+  themed.push(m);
+  return m;
+}
+function faceMat(hex, op) {                       // flat faces (end plates, pole tips): constant opacity
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = float(op).mul(uDet).mul(mix(float(1), float(1.8), uLight));
+  themed.push(m);
+  return m;
+}
+function cyl(r, hl, mat, sides = 96, z0 = 0, parent = det) {
+  const g = new THREE.CylinderGeometry(r, r, 2 * hl, sides, 1, true);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, z0);
+  const m = new THREE.Mesh(g, mat); parent.add(m); return m;
+}
+function ring(r0, r1, z, mat, sides = 96, parent = det) {
+  const g = new THREE.RingGeometry(r0, r1, sides, 1); g.translate(0, 0, z);
+  const m = new THREE.Mesh(g, mat); parent.add(m); return m;
+}
+const lineMats = [];
+const lineMat = (hex, op) => {
+  const m = new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+  m.userData.base = { color: new THREE.Color(hex), opacity: op };
+  lineMats.push(m);
+  return m;
+};
+function segs(v, mat, parent = det) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
+}
+function ringV(v, r, z, n, a0 = 0, a1 = 2 * Math.PI) {
+  for (let i = 0; i < n; i++) {
+    const p0 = a0 + i / n * (a1 - a0), p1 = a0 + (i + 1) / n * (a1 - a0);
+    v.push(r * Math.cos(p0), r * Math.sin(p0), z, r * Math.cos(p1), r * Math.sin(p1), z);
+  }
+  return v;
+}
+function polyLines(r, n, z0, z1, rot, mat, parent = det) {     // n-gon prism outline
+  const v = [];
+  for (let i = 0; i < n; i++) {
+    const a0 = rot + i / n * Math.PI * 2, a1 = rot + (i + 1) / n * Math.PI * 2;
+    const p0 = [r * Math.cos(a0), r * Math.sin(a0)], p1 = [r * Math.cos(a1), r * Math.sin(a1)];
+    for (const z of [z0, z1]) v.push(p0[0], p0[1], z, p1[0], p1[1], z);
+    v.push(p0[0], p0[1], z0, p0[0], p0[1], z1);
+  }
+  return segs(v, mat, parent);
+}
+const boxEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+function box(cx, cy, cz, sx, sy, sz, rotZ, lmat, fmat, parent = det) {   // sx radial, sy tangential when rotZ = φ
+  for (const [geo, mat] of [[boxEdges, lmat], [boxGeo, fmat]]) {
+    if (!mat) continue;
+    const o = geo === boxEdges ? new THREE.LineSegments(geo, mat) : new THREE.Mesh(geo, mat);
+    o.position.set(cx, cy, cz); o.scale.set(sx, sy, sz); o.rotation.z = rotZ; parent.add(o);
+  }
+}
+
+// --- beam line & pipe
+segs([0, 0, -ZBEAM, 0, 0, ZBEAM], lineMat(0x8796b1, 0.35), scene);
+cyl(BP_R, 2.0, shellMat('#8796b1', 0.25, 0.01), 24);
+
+// --- TPC: field cages, central membrane, 12 sectors per end, iTPC/outer boundary
+const tpcMat = shellMat('#6f8db8', 0.42, 0.012);
+cyl(TPC_ROUT, TPC_HL, tpcMat); cyl(TPC_RIN, TPC_HL, tpcMat, 64);
+{
+  const v = [], vs = [];
+  for (const z of [-TPC_HL, TPC_HL]) {
+    ringV(v, TPC_ROUT, z, 128); ringV(v, TPC_RIN, z, 64);
+    ringV(vs, ITPC_R, z, 96);
+    for (let s = 0; s < 12; s++) { const a = (15 + 30 * s) * D2R; vs.push(TPC_RIN * Math.cos(a), TPC_RIN * Math.sin(a), z, TPC_ROUT * Math.cos(a), TPC_ROUT * Math.sin(a), z); }
+  }
+  segs(v, lineMat(0x6f8db8, 0.38)); segs(vs, lineMat(0x6f8db8, 0.2));
+  segs(ringV([], TPC_ROUT, 0, 128), lineMat(0xffb24a, 0.18));            // central membrane
+  ring(TPC_RIN, TPC_ROUT, -TPC_HL, faceMat('#6f8db8', 0.018)); ring(TPC_RIN, TPC_ROUT, TPC_HL, faceMat('#6f8db8', 0.018));
+}
+// --- TOF: 120 trays (60 in φ per half)
+polyLines(TOF_R, 60, -TOF_HL, TOF_HL, 0, lineMat(0x9fb7e0, 0.13));
+segs(ringV(ringV([], TOF_R, 0, 60), TOF_R, 0.05, 60), lineMat(0x9fb7e0, 0.1));
+
+// --- solenoid coil (red), flux-return bars, end rings, pole tips
+const coilMat = shellMat('#c44a3a', 0.32, 0.01);
+cyl(COIL_R0, MAG_HL, coilMat, 120); cyl(COIL_R1, MAG_HL, coilMat, 120);
+{
+  const v = [];
+  for (const z of [-MAG_HL, MAG_HL]) { ringV(v, COIL_R0, z, 120); ringV(v, COIL_R1, z, 120); }
+  segs(v, lineMat(0xc44a3a, 0.3));
+}
+const ironL = lineMat(0x8fa0b8, 0.22), ironF = faceMat('#7d8ba3', 0.02);
+for (let k = 0; k < NBL; k++) {
+  const ph = (k * 12) * D2R, rm = (BL_R0 + BL_R1) / 2;
+  box(rm * Math.cos(ph), rm * Math.sin(ph), 0, BL_R1 - BL_R0, 2 * rm * Math.tan(6 * D2R) * 0.80, 2 * MAG_HL, ph, ironL, ironF);
+}
+for (const s of [-1, 1]) {
+  // end ring
+  ring(COIL_R0, BL_R1, s * ER_Z1, faceMat('#7d8ba3', 0.03), 120);
+  segs(ringV(ringV([], BL_R1, s * ER_Z1, 120), COIL_R0, s * ER_Z1, 120), lineMat(0x8fa0b8, 0.25));
+  // pole tip: annulus with central bore
+  ring(PT_RIN, PT_ROUT, s * PT_Z0, faceMat('#7d8ba3', 0.028), 96);
+  ring(PT_RIN, PT_ROUT, s * PT_Z1, faceMat('#7d8ba3', 0.02), 96);
+  cyl(PT_RIN, (PT_Z1 - PT_Z0) / 2, shellMat('#8fa0b8', 0.25, 0.01), 48, s * (PT_Z0 + PT_Z1) / 2);
+  const v = []; for (const z of [PT_Z0, PT_Z1]) { ringV(v, PT_RIN, s * z, 64); ringV(v, PT_ROUT, s * z, 96); }
+  segs(v, lineMat(0x8fa0b8, 0.24));
+}
+// --- MTD: 5 trays on each backleg (3 on the bottom ones)
+{
+  const mL = lineMat(0x7fd1a8, 0.11), mF = faceMat('#7fd1a8', 0.01);
+  for (let k = 0; k < NBL; k++) {
+    const phd = k * 12, ph = phd * D2R, bottom = Math.abs(phd - 270) < 13;
+    const zs = bottom ? [-0.87, 0, 0.87] : [-1.74, -0.87, 0, 0.87, 1.74];
+    for (const z of zs) box(MTD_R * Math.cos(ph), MTD_R * Math.sin(ph), z, 0.06, 0.52, 0.84, ph, mL, mF);
+  }
+}
+// --- EPD: two wheels, 12 supersectors × 16 rows
+const EPD_REDGE = Array.from({ length: 17 }, (_, i) => EPD_R0 + (EPD_R1 - EPD_R0) * i / 16);
+for (const s of [-1, 1]) {
+  const v = [], z = s * EPD_Z;
+  for (let i = 0; i < 17; i++) ringV(v, EPD_REDGE[i], z, 96);
+  for (let k = 0; k < 24; k++) {                        // supersector edges (even k) and tile splits (odd k, from row 2)
+    const a = k * 15 * D2R, r0 = k % 2 ? EPD_REDGE[1] : EPD_R0;
+    v.push(r0 * Math.cos(a), r0 * Math.sin(a), z, EPD_R1 * Math.cos(a), EPD_R1 * Math.sin(a), z);
+  }
+  segs(v, lineMat(0x5fd3c6, 0.32));
+  ring(EPD_R0, EPD_R1, z, faceMat('#5fd3c6', 0.035));
+}
+// --- VPD: 19 PMTs per side
+for (const s of [-1, 1]) {
+  const v = [];
+  for (let k = 0; k < 19; k++) { const a = k / 19 * 2 * Math.PI, rr = k % 2 ? 0.14 : 0.10; const c = [rr * Math.cos(a), rr * Math.sin(a)];
+    for (let i = 0; i < 12; i++) { const a0 = i / 12 * 2 * Math.PI, a1 = (i + 1) / 12 * 2 * Math.PI; v.push(c[0] + 0.022 * Math.cos(a0), c[1] + 0.022 * Math.sin(a0), s * VPD_Z, c[0] + 0.022 * Math.cos(a1), c[1] + 0.022 * Math.sin(a1), s * VPD_Z); } }
+  segs(v, lineMat(0x9fb7e0, 0.35));
+}
+// --- ZDCs (±18 m)
+for (const s of [-1, 1]) box(0, 0, s * (ZDC_Z + 0.5), 0.14, 0.14, 1.0, 0, lineMat(0x9fb7e0, 0.4), faceMat('#9fb7e0', 0.05));
+// --- Forward upgrade (West): FST, FTT
+{
+  const v = [];
+  for (const z of FST_Z) { ringV(v, FST_R0, z, 48); ringV(v, FST_R1, z, 64); for (let k = 0; k < 12; k++) { const a = k * 30 * D2R; v.push(FST_R0 * Math.cos(a), FST_R0 * Math.sin(a), z, FST_R1 * Math.cos(a), FST_R1 * Math.sin(a), z); } }
+  segs(v, lineMat(0x5fd3c6, 0.45));
+  const fm = faceMat('#5fd3c6', 0.05); for (const z of FST_Z) ring(FST_R0, FST_R1, z, fm, 48);
+  const w = [], h = FTT_H;
+  for (const z of FTT_Z) {
+    w.push(-h, -h, z, h, -h, z, h, -h, z, h, h, z, h, h, z, -h, h, z, -h, h, z, -h, -h, z, -h, 0, z, h, 0, z, 0, -h, z, 0, h, z);
+  }
+  segs(w, lineMat(0xffd166, 0.3));
+  const tm = faceMat('#ffd166', 0.025); for (const z of FTT_Z) { const g = new THREE.PlaneGeometry(2 * h, 2 * h); g.translate(0, 0, z); det.add(new THREE.Mesh(g, tm)); }
+}
+// --- FXT target (Au foil)
+{
+  const g = new THREE.PlaneGeometry(0.04, 0.012); g.translate(0, FXT_Y - 0.006, FXT_Z);
+  det.add(new THREE.Mesh(g, faceMat('#ffb24a', 0.6)));
+}
+// --- eTOF (East): 12 sectors × 3 modules (optional)
+{
+  const eL = lineMat(0xff9ec7, 0.4), eF = faceMat('#ff9ec7', 0.05);
+  const rr = [ETOF_RIN, ETOF_RIN + (ETOF_ROUT - ETOF_RIN) / 3, ETOF_RIN + 2 * (ETOF_ROUT - ETOF_RIN) / 3, ETOF_ROUT];
+  for (let s = 0; s < 12; s++) {
+    const ph = (s * 30 + 15) * D2R;
+    for (let m = 0; m < 3; m++) {
+      const rm = (rr[m] + rr[m + 1]) / 2, dz = (m % 2) * 0.05;
+      box(rm * Math.cos(ph), rm * Math.sin(ph), (ETOF_Z0 + ETOF_Z1) / 2 - dz, (rr[1] - rr[0]) * 0.92, 2 * rm * Math.tan(15 * D2R) * 0.85, ETOF_Z0 - ETOF_Z1, ph, eL, eF, etofG);
+    }
+  }
+}
+
+/* ================= calorimeters: BEMC, EEMC, FCS ECal (two halves) ================= */
+const CALS = [];
+let NTOW = 0;
+function addCal(c) { c.base = NTOW; NTOW += c.nU * c.nV; CALS.push(c); return c; }
+const BEMC = addCal({
+  name: 'BEMC', nU: 120, nV: 40, mod: [0.5, 0.05], col: '#c79bff', res: [0.14, 0.015],
+  surf: (u, v) => { const ph = u * 3 * D2R, et = -1 + v * 0.05; return [BEMC_R * Math.cos(ph), BEMC_R * Math.sin(ph), BEMC_R * Math.sinh(et)]; },
+  locate: (x, y, z) => { const r = Math.hypot(x, y); return [normPhi(Math.atan2(y, x)) / (3 * D2R), (Math.asinh(z / r) + 1) / 0.05]; },
+  cell(iu, iv) {
+    const c = new THREE.Vector3(...this.surf(iu + 0.5, iv + 0.5)), a = c.clone().normalize();
+    const ph = (iu + 0.5) * 3 * D2R, e1 = new THREE.Vector3(-Math.sin(ph), Math.cos(ph), 0);
+    return { c, a, e1, e2: new THREE.Vector3().crossVectors(a, e1).normalize(), w1: 0.5 * 0.85 * BEMC_R * 3 * D2R, w2: 0.5 * 0.85 * BEMC_R * 0.05 };
+  },
+});
+const EE_DE = (EEMC_E1 - EEMC_E0) / 12;
+const EEMC = addCal({
+  name: 'EEMC', nU: 60, nV: 12, mod: [0.2, 1 / 12], col: '#c79bff', res: [0.16, 0.02],
+  surf: (u, v) => { const ph = u * 6 * D2R, r = EEMC_Z0 / Math.sinh(EEMC_E0 + v * EE_DE); return [r * Math.cos(ph), r * Math.sin(ph), EEMC_Z0]; },
+  locate: (x, y, z) => { const r = Math.hypot(x, y); return [normPhi(Math.atan2(y, x)) / (6 * D2R), (Math.asinh(z / r) - EEMC_E0) / EE_DE]; },
+  cell(iu, iv) {
+    const c = new THREE.Vector3(...this.surf(iu + 0.5, iv + 0.5)), a = c.clone().normalize(), r = Math.hypot(c.x, c.y);
+    const ph = (iu + 0.5) * 6 * D2R, e1 = new THREE.Vector3(-Math.sin(ph), Math.cos(ph), 0);
+    const dr = EEMC_Z0 / Math.sinh(EEMC_E0 + iv * EE_DE) - EEMC_Z0 / Math.sinh(EEMC_E0 + (iv + 1) * EE_DE);
+    return { c, a, e1, e2: new THREE.Vector3().crossVectors(a, e1).normalize(), w1: 0.5 * 0.85 * r * 6 * D2R, w2: 0.5 * 0.85 * dr * EEMC_Z0 / c.length() };
+  },
+});
+const FCS = [1, -1].map(sg => addCal({
+  name: 'FCS', nU: FCS_NC, nV: FCS_NR, mod: [0.5, 0.5], col: '#ffb24a', res: [0.10, 0.02], sg,
+  surf: (u, v) => [sg * (FCS_X0 + u * FCS_C), -FCS_NR * FCS_C / 2 + v * FCS_C, FCS_Z],
+  locate: (x, y) => [(sg * x - FCS_X0) / FCS_C, (y + FCS_NR * FCS_C / 2) / FCS_C],
+  cell(iu, iv) {
+    return { c: new THREE.Vector3(...this.surf(iu + 0.5, iv + 0.5)), a: new THREE.Vector3(0, 0, 1), e1: new THREE.Vector3(1, 0, 0), e2: new THREE.Vector3(0, 1, 0), w1: 0.45 * FCS_C, w2: 0.45 * FCS_C };
+  },
+}));
+const towE = new Float32Array(NTOW), towT = new Float32Array(NTOW);
+const towGeo = [];                                    // per-tower geometry, precomputed
+for (const cal of CALS) for (let iu = 0; iu < cal.nU; iu++) for (let iv = 0; iv < cal.nV; iv++) towGeo[cal.base + iu * cal.nV + iv] = cal.cell(iu, iv);
+
+// calorimeter faces: procedural tower / module grid (TSL, fwidth-antialiased)
+function calFaceMat(hex, modU, modV, k = 1) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const uvT = attribute('uvT', 'vec2');
+  const gridLine = (q, wmul) => {
+    const f = fract(q), w = fwidth(q).mul(wmul);
+    const d = min(f, float(1).sub(f));
+    const l = float(1).sub(smoothstep(float(0), w, d));
+    return max(l.x, l.y);
+  };
+  const fw = fwidth(uvT);
+  const fade = float(1).sub(smoothstep(0.22, 0.6, max(fw.x, fw.y)));
+  const tower = gridLine(uvT, 1.0).mul(fade);
+  const module = gridLine(uvT.mul(vec3(modU, modV, 0).xy), 1.4);
+  m.colorNode = mix(color(hex), color('#6a3fb8'), uLight);
+  m.opacityNode = float(0.03).add(tower.mul(0.15)).add(module.mul(0.24)).mul(k).mul(uDet).mul(mix(float(1), float(1.5), uLight));
+  themed.push(m);
+  return m;
+}
+for (const cal of CALS) {
+  const nU = cal.nU, nV = cal.nV, pos = [], uv = [], idx = [];
+  for (let i = 0; i <= nU; i++) for (let j = 0; j <= nV; j++) { pos.push(...cal.surf(i, j)); uv.push(i, j); }
+  for (let i = 0; i < nU; i++) for (let j = 0; j < nV; j++) { const a = i * (nV + 1) + j, b = a + nV + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uvT', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx); g.computeVertexNormals();
+  det.add(new THREE.Mesh(g, calFaceMat(cal.col, cal.mod[0], cal.mod[1], cal === BEMC ? 0.35 : cal === EEMC ? 0.6 : 0.8)));
+}
+{ // calorimeter outlines
+  const bL = lineMat(0xc79bff, 0.32), v = [];
+  for (const z of [-BEMC_ZF, BEMC_ZF]) ringV(v, BEMC_R, z, 120);
+  for (const z of [-BEMC_R2 * Math.sinh(1), BEMC_R2 * Math.sinh(1)]) ringV(v, BEMC_R2, z, 120);
+  ringV(v, BEMC_R2, 0, 120);
+  for (let k = 0; k < 60; k += 1) {
+    const a = k * 6 * D2R, z = BEMC_R2 * Math.sinh(1);
+    v.push(BEMC_R2 * Math.cos(a), BEMC_R2 * Math.sin(a), -z, BEMC_R2 * Math.cos(a), BEMC_R2 * Math.sin(a), z);
+  }
+  segs(v, lineMat(0xc79bff, 0.14));
+  const e = [];
+  for (const z of [EEMC_Z0, EEMC_Z1]) { const k = z / EEMC_Z0; ringV(e, EEMC_RIN * k, z, 60); ringV(e, EEMC_ROUT * k, z, 120); }
+  for (let s = 0; s < 12; s++) { const a = (s * 30) * D2R; e.push(EEMC_ROUT * Math.cos(a), EEMC_ROUT * Math.sin(a), EEMC_Z0, EEMC_ROUT * EEMC_Z1 / EEMC_Z0 * Math.cos(a), EEMC_ROUT * EEMC_Z1 / EEMC_Z0 * Math.sin(a), EEMC_Z1); }
+  segs(e, bL);
+  // FCS ECal / HCal boxes (North & South halves)
+  const fL = lineMat(0xffb24a, 0.32), hL = lineMat(0xd9824a, 0.26), hF = faceMat('#d9824a', 0.025);
+  for (const sg of [1, -1]) {
+    const wE = FCS_NC * FCS_C, hE = FCS_NR * FCS_C, wH = HCAL_NC * HCAL_C, hH = HCAL_NR * HCAL_C;
+    box(sg * (FCS_X0 + wE / 2), 0, FCS_Z + FCS_D / 2, wE, hE, FCS_D, 0, fL, null);
+    box(sg * (HCAL_X0 + wH / 2), 0, HCAL_Z + HCAL_D / 2, wH, hH, HCAL_D, 0, hL, hF);
+  }
+}
+
+/* ---------------- nuclei (instanced nucleons) ---------------- */
+const NUC = 400;
+const nucMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.4, metalness: 0.15 });
+const nucMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), nucMat, NUC);
+nucMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+for (let i = 0; i < NUC; i++) nucMesh.setColorAt(i, new THREE.Color(0x9fb2cf));
+nucMesh.frustumCulled = false; nucMesh.count = 0;
+scene.add(nucMesh);
+
+/* ---------------- fireball ---------------- */
+const fireMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const n = mx_noise_float(positionLocal.mul(3.2).add(vec3(0, 0, time.mul(1.4))));
+  const core = abs(dot(normalView, positionViewDirection)).pow(1.6);
+  fireMat.colorNode = mix(mix(color('#ff4a1c'), color('#fff2cf'), core.add(n.mul(0.35)).clamp(0, 1)).mul(1.7),
+                          mix(color('#d92e00'), color('#ff9a1f'), core.add(n.mul(0.35)).clamp(0, 1)), uLight);
+  themed.push(fireMat);
+  fireMat.opacityNode = uFire.mul(core.mul(0.85).add(0.12)).mul(n.mul(0.45).add(0.8));
+}
+const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 5), fireMat);
+const fireGroup = new THREE.Group(); fireGroup.add(fire); scene.add(fireGroup);
+
+/* ---------------- tracks ---------------- */
+const tPos = new Float32Array(MAXV * 3), tPath = new Float32Array(MAXV), tCol = new Float32Array(MAXV * 3);
+const trkGeo = new THREE.BufferGeometry();
+const aPos = new THREE.BufferAttribute(tPos, 3).setUsage(THREE.DynamicDrawUsage);
+const aPath = new THREE.BufferAttribute(tPath, 1).setUsage(THREE.DynamicDrawUsage);
+const aCol = new THREE.BufferAttribute(tCol, 3).setUsage(THREE.DynamicDrawUsage);
+trkGeo.setAttribute('position', aPos); trkGeo.setAttribute('pathT', aPath); trkGeo.setAttribute('tcol', aCol);
+trkGeo.setDrawRange(0, 0);
+const trkMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const head = exp(uT.sub(pT).max(0).mul(-7)).mul(2.6).add(1);
+  const rT = positionLocal.xy.length();
+  const zA = abs(positionLocal.z);
+  const inGas = smoothstep(0.42, 0.55, rT).mul(float(1).sub(smoothstep(1.95, 2.1, rT))).mul(float(1).sub(smoothstep(2.05, 2.2, zA)));
+  const outer = mix(float(0.28), float(1), inGas);                               // full brightness only in the TPC gas
+  trkMat.colorNode = attribute('tcol', 'vec3').mul(mix(head, float(0.72), uLight));
+  themed.push(trkMat);
+  trkMat.opacityNode = step(pT, uT).mul(outer).mul(0.9);
+}
+const tracks = new THREE.LineSegments(trkGeo, trkMat); tracks.frustumCulled = false; scene.add(tracks);
+
+/* ---------------- hits ---------------- */
+const hitGeo = new THREE.OctahedronGeometry(1, 0);
+const hT = new THREE.InstancedBufferAttribute(new Float32Array(MAXH), 1).setUsage(THREE.DynamicDrawUsage);
+const hC = new THREE.InstancedBufferAttribute(new Float32Array(MAXH * 3), 3).setUsage(THREE.DynamicDrawUsage);
+hitGeo.setAttribute('hitT', hT); hitGeo.setAttribute('hcol', hC);
+const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const ht = attribute('hitT', 'float');
+  hitMat.colorNode = attribute('hcol', 'vec3').mul(mix(exp(uT.sub(ht).max(0).mul(-5)).mul(3).add(1.2), float(0.6), uLight));
+  themed.push(hitMat);
+  hitMat.opacityNode = step(ht, uT);
+}
+const hits = new THREE.InstancedMesh(hitGeo, hitMat, MAXH); hits.count = 0; hits.frustumCulled = false;
+hits.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(hits);
+
+/* ---------------- calorimeter towers ---------------- */
+const TV = 20;
+const twBuf = {
+  position: new Float32Array(NTOW * TV * 3), normal: new Float32Array(NTOW * TV * 3),
+  dH: new Float32Array(NTOW * TV * 3), ctr: new Float32Array(NTOW * TV * 3), ecol: new Float32Array(NTOW * TV * 3),
+  top: new Float32Array(NTOW * TV), tArr: new Float32Array(NTOW * TV),
+};
+const twGeo = new THREE.BufferGeometry();
+const twAttr = {};
+for (const [k, arr] of Object.entries(twBuf)) {
+  twAttr[k] = new THREE.BufferAttribute(arr, arr.length === NTOW * TV ? 1 : 3).setUsage(THREE.DynamicDrawUsage);
+  twGeo.setAttribute(k, twAttr[k]);
+}
+{
+  const idx = new Uint32Array(NTOW * 30);
+  for (let t = 0, o = 0; t < NTOW; t++) for (let q = 0; q < 5; q++) { const b = t * TV + q * 4; idx.set([b, b + 1, b + 2, b, b + 2, b + 3], o); o += 6; }
+  twGeo.setIndex(new THREE.BufferAttribute(idx, 1));
+}
+twGeo.setDrawRange(0, 0);
+const towMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
+{
+  const top = attribute('top', 'float'), dH = attribute('dH', 'vec3'), ta = attribute('tArr', 'float'), ctr = attribute('ctr', 'vec3');
+  const grow = smoothstep(ta, ta.add(0.9), uT);
+  const risen = positionLocal.sub(dH.mul(top).mul(float(1).sub(grow)));
+  towMat.positionNode = mix(ctr, risen, step(ta, uT));
+  const col = attribute('ecol', 'vec3');
+  towMat.colorNode = col;
+  towMat.emissiveNode = col.mul(exp(uT.sub(ta).max(0).mul(-3)).mul(2.4).add(0.3));
+}
+const towers = new THREE.Mesh(twGeo, towMat); towers.frustumCulled = false; scene.add(towers);
+
+const E_STOPS = [0.1, 20];
+const E_COLS = ['#3d2b8f', '#9a3cc0', '#ff5a7a', '#ffb24a', '#fff3c4'].map(h => new THREE.Color(h));
+function energyColor(E, out) {
+  const x = THREE.MathUtils.clamp(Math.log10(E / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]), 0, 1) * 4;
+  const i = Math.min(3, Math.floor(x));
+  return out.copy(E_COLS[i]).lerp(E_COLS[i + 1], x - i);
+}
+
+/* ---------------- photons ---------------- */
+const gBuf = { position: new Float32Array(MAXG * 6), pathT: new Float32Array(MAXG * 2), gE: new Float32Array(MAXG * 2) };
+const gGeo = new THREE.BufferGeometry();
+const gAttr = {
+  position: new THREE.BufferAttribute(gBuf.position, 3).setUsage(THREE.DynamicDrawUsage),
+  pathT: new THREE.BufferAttribute(gBuf.pathT, 1).setUsage(THREE.DynamicDrawUsage),
+  gE: new THREE.BufferAttribute(gBuf.gE, 1).setUsage(THREE.DynamicDrawUsage),
+};
+for (const [k, a] of Object.entries(gAttr)) gGeo.setAttribute(k, a);
+gGeo.setDrawRange(0, 0);
+const gMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const pT = attribute('pathT', 'float');
+  const dash = step(fract(pT.mul(12)), float(0.5));
+  const head = exp(uT.sub(pT).max(0).mul(-6)).mul(2.4).add(1);
+  gMat.colorNode = mix(color('#fff0b8').mul(attribute('gE', 'float')).mul(head), color('#9a6a00'), uLight);
+  themed.push(gMat);
+  gMat.opacityNode = step(pT, uT).mul(dash).mul(0.8);
+}
+const gammas = new THREE.LineSegments(gGeo, gMat); gammas.frustumCulled = false; scene.add(gammas);
+
+/* ---------------- bloom ---------------- */
+let post = null;
+try {
+  post = new THREE.PostProcessing(renderer);
+  const sp = pass(scene, camera);
+  const col = sp.getTextureNode('output');
+  post.outputNode = col.add(bloom(col, 0.6, 0.35, 0.15));
+} catch (e) { post = null; }
+
+/* ================= physics: Glauber + toy hadron production ================= */
+const rnd = Math.random;
+function gauss() { return Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd()); }
+
+function nucleus(key) {
+  const N = NUCLEI[key];
+  if (N.A === 1) return [[0, 0, 0, 1]];
+  if (N.A === 2) {                                  // Hulthén deuteron, |ψ|² r² ∝ (e^{-ar} − e^{-br})², a = 0.228, b = 1.18 fm⁻¹
+    let r; do { r = rnd() * 14; } while (rnd() * 0.42 > (Math.exp(-0.228 * r) - Math.exp(-1.18 * r)) ** 2);
+    const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = 2 * Math.PI * rnd(), h = r / 2;
+    return [[h * st * Math.cos(ph), h * st * Math.sin(ph), h * ct, 1], [-h * st * Math.cos(ph), -h * st * Math.sin(ph), -h * ct, 0]];
+  }
+  const R = N.R, a = N.a, rmax = R + 6 * a, pts = [];
+  while (pts.length < N.A) {
+    const r = rnd() * rmax;
+    if (rnd() * rmax * rmax > r * r / (1 + Math.exp((r - R) / a))) continue;
+    const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = 2 * Math.PI * rnd();
+    const p = [r * st * Math.cos(ph), r * st * Math.sin(ph), r * ct, 0];
+    let ok = true;
+    for (const q of pts) { const dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2]; if (dx * dx + dy * dy + dz * dz < 0.16) { ok = false; break; } }
+    if (ok) pts.push(p);
+  }
+  let cx = 0, cy = 0, cz = 0; for (const p of pts) { cx += p[0]; cy += p[1]; cz += p[2]; }
+  cx /= N.A; cy /= N.A; cz /= N.A;
+  for (const p of pts) { p[0] -= cx; p[1] -= cy; p[2] -= cz; }
+  // assign protons
+  const idx = [...pts.keys()].sort(() => rnd() - 0.5);
+  for (let i = 0; i < N.Z; i++) pts[idx[i]][3] = 1;
+  return pts;
+}
+
+const PT_STOPS = [0, 0.4, 1, 2, 4];
+const PT_COLS = ['#3b5bff', '#2fc4e0', '#7be38a', '#ffd166', '#ff5d3a'].map(h => new THREE.Color(h));
+const CH_COLS = { '1': new THREE.Color('#ff7a59'), '-1': new THREE.Color('#4fa3ff') };
+const SP = [
+  { name: 'π±', m: 0.1396, theta: 0.25, col: new THREE.Color('#7aa2ff') },
+  { name: 'K±', m: 0.4937, theta: 0.36, col: new THREE.Color('#ffd166') },
+  { name: 'p, p̄', m: 0.9383, theta: 0.47, col: new THREE.Color('#ff6b8b') },
+  { name: 'd', m: 1.8756, theta: 0.62, col: new THREE.Color('#b78cff') },
+];
+const tmpC = new THREE.Color();
+function trackColor(tr, mode) {
+  if (mode === 'charge') return CH_COLS[tr.q];
+  if (mode === 'species') return SP[tr.sp].col;
+  const p = Math.min(tr.pt, 4);
+  let i = 0; while (i < 3 && p > PT_STOPS[i + 1]) i++;
+  const f = (p - PT_STOPS[i]) / (PT_STOPS[i + 1] - PT_STOPS[i]);
+  return tmpC.copy(PT_COLS[i]).lerp(PT_COLS[i + 1], f);
+}
+
+let ev = null, evNo = 0;
+let colorMode = 'pt', etofOn = true;
+let sysKey = 'AuAu', rsSel = 200;
+
+/* ---------------- calorimeter response ---------------- */
+function deposit(cal, x, y, z, E, tArr, sigma, nS) {
+  const [u, v] = cal.locate(x, y, z);
+  if (!(u >= 0 && u < cal.nU && v >= 0 && v < cal.nV)) return false;
+  const e = E / nS;
+  for (let i = 0; i < nS; i++) {
+    let iu = Math.floor(u + sigma * gauss()), iv = Math.floor(v + sigma * gauss());
+    if (cal === BEMC || cal === EEMC) iu = (iu + cal.nU) % cal.nU;           // φ wraps
+    if (iu < 0 || iu >= cal.nU || iv < 0 || iv >= cal.nV) continue;
+    const id = cal.base + iu * cal.nV + iv;
+    if (towE[id] === 0 || tArr < towT[id]) towT[id] = tArr;
+    towE[id] += e;
+  }
+  return true;
+}
+const smear = (cal, E) => Math.max(0, E * (1 + gauss() * Math.hypot(cal.res[0] / Math.sqrt(Math.max(E, 0.05)), cal.res[1])));
+const fcsAt = (x, y) => FCS.find(c => { const [u, v] = c.locate(x, y); return u >= 0 && u < c.nU && v >= 0 && v < c.nV; });
+
+// two-body decay M → γγ, isotropic in the rest frame, boosted to the lab
+function decayGG(m, E, px, py, pz) {
+  const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = 2 * Math.PI * rnd(), e = m / 2;
+  const bx = px / E, by = py / E, bz = pz / E, b2 = bx * bx + by * by + bz * bz, g = E / m;
+  const out = [];
+  for (const s of [1, -1]) {
+    const qx = s * e * st * Math.cos(ph), qy = s * e * st * Math.sin(ph), qz = s * e * ct;
+    const bq = bx * qx + by * qy + bz * qz, k = b2 > 1e-12 ? (g - 1) * bq / b2 + g * e : g * e;
+    out.push([g * (e + bq), qx + k * bx, qy + k * by, qz + k * bz]);
+  }
+  return out;
+}
+
+function buildTowers() {
+  let n = 0, sumE = 0;
+  const col = new THREE.Color(), corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]], B = twBuf;
+  for (let id = 0; id < NTOW; id++) {
+    const E = towE[id];
+    if (E < 0.1) continue;
+    sumE += E;
+    const { c, a, e1, e2, w1, w2 } = towGeo[id];
+    const H = Math.min(0.1 * E, 1.2);
+    energyColor(E, col);
+    const bs = corners.map(([s1, s2]) => c.clone().addScaledVector(e1, s1 * w1).addScaledVector(e2, s2 * w2));
+    const ts = bs.map(p => p.clone().addScaledVector(a, H));
+    const quads = [[ts, [1, 1, 1, 1], a]];
+    for (let k = 0; k < 4; k++) {
+      const k1 = (k + 1) % 4;
+      quads.push([[bs[k], bs[k1], ts[k1], ts[k]], [0, 0, 1, 1], bs[k].clone().add(bs[k1]).multiplyScalar(0.5).sub(c).normalize()]);
+    }
+    let vtx = n * TV;
+    for (const [pts, tops, nrm] of quads) for (let j = 0; j < 4; j++, vtx++) {
+      const o = vtx * 3;
+      B.position[o] = pts[j].x; B.position[o + 1] = pts[j].y; B.position[o + 2] = pts[j].z;
+      B.normal[o] = nrm.x; B.normal[o + 1] = nrm.y; B.normal[o + 2] = nrm.z;
+      B.dH[o] = a.x * H; B.dH[o + 1] = a.y * H; B.dH[o + 2] = a.z * H;
+      B.ctr[o] = c.x; B.ctr[o + 1] = c.y; B.ctr[o + 2] = c.z;
+      B.ecol[o] = col.r; B.ecol[o + 1] = col.g; B.ecol[o + 2] = col.b;
+      B.top[vtx] = tops[j]; B.tArr[vtx] = towT[id];
+    }
+    n++;
+  }
+  twGeo.setDrawRange(0, n * 30);
+  for (const at of Object.values(twAttr)) at.needsUpdate = true;
+  return { nTw: n, sumE };
+}
+
+/* ---- kinematic settings for the selected system & energy ---- */
+function kinematics(sys, rs) {
+  const S_ = SYSTEMS[sys], yb = yBeamCM(rs);
+  const L = Math.log(rs / 1.9), Lmax = Math.log(200 / 1.9);
+  return {
+    fxt: !!S_.fxt, rs, yb,
+    gCM: rs / (2 * MP), gLab: S_.fxt ? fxtElab(rs) / MP : 0,
+    sigNN: lerpLog(SIG_NN, rs),
+    npp: 2.25 * Math.pow(Math.max(L, 0.05) / Lmax, 0.85),          // meson dN/dη per participant pair (soft part)
+    xhard: 0.13 * clamp01(Math.log(rs / 5) / Math.log(40)),
+    sigY: Math.sqrt(Math.max(Math.log(rs / (2 * MP)), 0.25)),      // Landau width
+    kT: 0.8 + 0.2 * clamp01(Math.log(rs / 3) / Math.log(66.7)),
+    tail: 0.03 * clamp01(Math.log(rs / 5) / Math.log(40)),
+    fK: 0.13 * Math.sqrt(clamp01((rs - 2.6) / 6)),
+    rK: Math.exp(-2.8 / Math.sqrt(rs)),                             // K⁻/K⁺
+    piAsym: 0.2 * Math.exp(-(rs - 3) / 4),                          // π⁻ excess at low √s (isospin)
+    fpp: 0.035 * Math.exp(-30 / rs),                                // produced p p̄ pairs per meson
+    fd: 0.35 * Math.exp(-(rs - 3) / 3.5),                           // d per participant proton
+    yLoss: 2.0,
+    k2: lerpLog(K_V2, rs), v1p: lerpLog(V1_P, rs),
+  };
+}
+
+function generate(centPct) {
+  const S_ = SYSTEMS[sysKey], NA = NUCLEI[S_.A], NB = NUCLEI[S_.B];
+  const K = kinematics(sysKey, rsSel);
+  const d2 = K.sigNN / 10 / Math.PI;                              // fm²
+  const isPP = NA.A === 1 && NB.A === 1;
+  const bmax = isPP ? Math.sqrt(d2) : NA.R + NB.R + 2.0;
+
+  let A, B, b, c, partA, partB, ncoll = 0, tries = 0;
+  do {
+    c = Math.min(Math.max(centPct + 2.5 + (rnd() - 0.5) * 5, 0.3), 95) / 100;
+    if (tries > 20) c = rnd() * 0.5;
+    b = Math.sqrt(c) * bmax;
+    A = nucleus(S_.A); B = nucleus(S_.B);
+    for (const p of A) p[0] += b / 2;
+    for (const p of B) p[0] -= b / 2;
+    partA = new Uint8Array(A.length); partB = new Uint8Array(B.length); ncoll = 0;
+    for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
+      const dx = A[i][0] - B[j][0], dy = A[i][1] - B[j][1];
+      if (dx * dx + dy * dy < d2) { ncoll++; partA[i] = 1; partB[j] = 1; }
+    }
+    tries++;
+  } while (ncoll === 0 && tries < 60);
+  // random reaction-plane orientation: Ψ_RP = rot (projectile A displaced towards +x̂ before rotation)
+  const rot = rnd() * Math.PI * 2, cr = Math.cos(rot), sr = Math.sin(rot);
+  for (const p of [...A, ...B]) { const x = p[0], y = p[1]; p[0] = cr * x - sr * y; p[1] = sr * x + cr * y; }
+  const nucleons = [];
+  A.forEach((p, i) => nucleons.push({ p, side: 1, part: partA[i], prot: p[3] }));
+  B.forEach((p, i) => nucleons.push({ p, side: -1, part: partB[i], prot: p[3] }));
+  const parts = nucleons.filter(n => n.part);
+  const npart = parts.length, npA = partA.reduce((a, x) => a + x, 0), npB = npart - npA;
+
+  // participant eccentricity and plane
+  let mx = 0, my = 0; for (const n of parts) { mx += n.p[0]; my += n.p[1]; }
+  mx /= Math.max(npart, 1); my /= Math.max(npart, 1);
+  let r2 = 0, c2 = 0, s2 = 0;
+  for (const n of parts) { const x = n.p[0] - mx, y = n.p[1] - my, rr = x * x + y * y, ph = Math.atan2(y, x); r2 += rr; c2 += rr * Math.cos(2 * ph); s2 += rr * Math.sin(2 * ph); }
+  const eps2 = npart > 2 && r2 > 0 ? Math.hypot(c2, s2) / r2 : 0;
+  const psi2 = (Math.atan2(s2, c2) + Math.PI) / 2;
+  let su = 0, sv = 0; const cu = Math.cos(psi2), snu = Math.sin(psi2);
+  for (const n of parts) { const x = n.p[0] - mx, y = n.p[1] - my; const u = x * cu + y * snu, v = -x * snu + y * cu; su += u * u; sv += v * v; }
+  su = Math.sqrt(su / Math.max(npart, 1)) + 0.4; sv = Math.sqrt(sv / Math.max(npart, 1)) + 0.4;
+  const v2 = THREE.MathUtils.clamp(K.k2 * eps2, -0.1, 0.2);
+
+  // ---- particle list (CM rapidity y, pT, φ, species, charge)
+  const plist = [];
+  const lab = y => K.fxt ? -(y + K.yb) : y;                       // FXT: beam West→East, target at rest
+  const samplePt = (theta) => {
+    const pt = rnd() > K.tail ? -theta * K.kT * Math.log((rnd() + 1e-9) * (rnd() + 1e-9)) : 1.2 * Math.pow(rnd() + 1e-9, -1 / 4.5);
+    return Math.min(Math.max(pt, 0.03), 25);
+  };
+  const samplePhi = (v1, v2pt) => {
+    const wmax = 1 + 2 * Math.abs(v1) + 2 * Math.abs(v2pt);
+    let phi; do { phi = rnd() * 2 * Math.PI; } while (rnd() * wmax > 1 + 2 * v1 * Math.cos(phi - rot) + 2 * v2pt * Math.cos(2 * (phi - psi2)));
+    return phi;
+  };
+  const emit = (sp, q, y, baryon) => {
+    const pt = samplePt(SP[sp].theta);
+    const v1 = THREE.MathUtils.clamp((baryon ? K.v1p : -0.25 * K.v1p) * y, -0.35, 0.35);
+    const v2pt = THREE.MathUtils.clamp(v2 * Math.min(pt / 0.7, 2.6), -0.15, 0.3);
+    plist.push({ sp, q, y, pt, phi: samplePhi(v1, v2pt) });
+  };
+  // mesons (two-component, Gaussian dN/dy, side-weighted for asymmetric systems)
+  const dndeta = K.npp * ((1 - K.xhard) * npart / 2 + K.xhard * ncoll);
+  const nMes = Math.round(dndeta * 1.15 * Math.sqrt(2 * Math.PI) * K.sigY * (1 + 0.05 * gauss()));
+  const wA = npart ? npA / npart : 0.5;
+  const yMes = () => (rnd() < wA ? 1 : -1) * 0.3 * K.sigY + K.sigY * gauss();
+  let nPi0 = 0;
+  for (let k = 0; k < nMes; k++) {
+    const y = yMes();
+    if (rnd() < 1 / 3) { nPi0++; continue; }                     // π⁰ (decayed below)
+    if (rnd() < K.fK * 1.5) emit(1, rnd() < 1 / (1 + K.rK) ? 1 : -1, y, false);
+    else emit(0, rnd() < 0.5 * (1 - K.piAsym) ? 1 : -1, y, false);
+    if (rnd() < K.fpp) { emit(2, 1, yMes(), true); emit(2, -1, yMes(), true); }
+  }
+  // participant protons with rapidity loss (stopping), coalesced deuterons
+  let nPprot = 0;
+  for (const n of parts) {
+    if (!n.prot) continue;
+    const y = n.side * Math.max(0, K.yb - K.yLoss) + Math.min(0.9, 0.35 + 0.3 * K.yb) * gauss();
+    nPprot++;
+    if (rnd() < K.fd) emit(3, 1, y * 0.9, true); else emit(2, 1, Math.max(-K.yb, Math.min(K.yb, y)), true);
+  }
+
+  // ---- tracking
+  const vx = 0, vy = K.fxt ? FXT_Y : 0;
+  const vz = K.fxt ? FXT_Z + 0.002 * gauss() : THREE.MathUtils.clamp((rsSel < 100 ? 0.4 : 0.2) * gauss(), -0.7, 0.7);
+  const trks = [];
+  let nv = 0, nh = 0, maxPath = 0, nTOF = 0, nEPD = 0, nTPC = 0, nPTPC = 0, nETOF = 0;
+  const hitM = new THREE.Matrix4(), hq = new THREE.Quaternion(), hs = new THREE.Vector3(), hp = new THREE.Vector3();
+  towE.fill(0); towT.fill(0);
+  const addHit = (x, y, z, s, sc, tr) => {
+    if (nh >= MAXH) return;
+    hp.set(x, y, z); hs.setScalar(sc); hitM.compose(hp, hq, hs); hits.setMatrixAt(nh, hitM);
+    hT.array[nh] = s; nh++; tr.nh++;
+  };
+  const pushSeg = (x, y, z, s, nx, ny, nz, ns) => {
+    const o = nv * 3;
+    tPos[o] = x; tPos[o + 1] = y; tPos[o + 2] = z; tPath[nv] = s;
+    tPos[o + 3] = nx; tPos[o + 4] = ny; tPos[o + 5] = nz; tPath[nv + 1] = ns;
+    nv += 2;
+  };
+  const crossR = (r0, r1, R) => (r0 < R) !== (r1 < R);
+  const crossZ = (z0, z1, Z) => (z0 < Z) !== (z1 < Z);
+  const calDep = (cal, x, y, z, p, s, tr) => {
+    const mip = rnd() < 0.62;
+    const Edep = mip ? 0.26 * (1 + 0.12 * gauss()) : p * (0.15 + 0.5 * rnd());
+    return deposit(cal, x, y, z, Edep, s, mip ? 0.15 : 0.45, mip ? 3 : 12);
+  };
+
+  for (const P of plist) {
+    if (trks.length >= MAXTRK || nv + 4 > MAXV) break;
+    const m = SP[P.sp].m, mT = Math.hypot(m, P.pt), yl = lab(P.y);
+    const pz = mT * Math.sinh(yl), eta = Math.asinh(pz / P.pt);
+    if (Math.abs(eta) > 5.3) continue;                              // no detector beyond the VPD/EPD
+    const pt = P.pt, q = P.q, R = pt / (0.3 * BFIELD), sh = Math.sinh(eta), ch = Math.cosh(eta);
+    const tr = { pt, q, sp: P.sp, start: nv, count: 0, h0: nh, nh: 0 };
+    let x = vx, y = vy, z = vz, alpha = P.phi, s3 = 0, turned = 0, seg = 0, tpcL = 0, tofDone = false, fwd = false;
+    while (seg < MAXSEG && nv + 2 <= MAXV) {
+      const r = Math.hypot(x, y);
+      const ds = Math.min(0.08, 0.13 * R, 0.012 + 0.25 * r, 0.15 / Math.max(Math.abs(sh), 0.05));
+      const da = -q * ds / R, am = alpha + da / 2;
+      const nx = x + Math.cos(am) * ds, ny = y + Math.sin(am) * ds, nz = z + sh * ds, ns = s3 + ds * ch;
+      pushSeg(x, y, z, s3, nx, ny, nz, ns); seg++;
+      const rn = Math.hypot(nx, ny), rm = (r + rn) / 2, zm = (z + nz) / 2;
+      if (rm > TPC_RIN && rm < TPC_ROUT && Math.abs(zm) < TPC_HL) tpcL += ds * ch;
+      const at = (f) => [x + f * (nx - x), y + f * (ny - y), z + f * (nz - z), s3 + f * (ns - s3)];
+      let stop = false;
+      if (!tofDone && crossR(r, rn, TOF_R)) {
+        const h = at((TOF_R - r) / (rn - r));
+        if (Math.abs(h[2]) < TOF_HL) { addHit(h[0], h[1], h[2], h[3], 0.026, tr); nTOF++; tofDone = true; }
+      }
+      if (crossR(r, rn, BEMC_R)) {
+        const h = at((BEMC_R - r) / (rn - r));
+        if (Math.abs(h[2]) <= BEMC_ZF) { calDep(BEMC, h[0], h[1], h[2], pt * ch, h[3], tr); stop = true; }
+      }
+      for (const Z of FST_Z) if (crossZ(z, nz, Z)) {
+        const h = at((Z - z) / (nz - z)), hr = Math.hypot(h[0], h[1]);
+        if (hr > FST_R0 && hr < FST_R1) addHit(h[0], h[1], h[2], h[3], 0.009, tr);
+      }
+      for (const Z of FTT_Z) if (crossZ(z, nz, Z)) {
+        const h = at((Z - z) / (nz - z));
+        if (Math.abs(h[0]) < FTT_H && Math.abs(h[1]) < FTT_H && Math.hypot(h[0], h[1]) > FTT_HOLE) addHit(h[0], h[1], h[2], h[3], 0.013, tr);
+      }
+      if (etofOn && crossZ(z, nz, ETOF_Z0)) {
+        const h = at((ETOF_Z0 - z) / (nz - z)), hr = Math.hypot(h[0], h[1]);
+        if (hr > ETOF_RIN && hr < ETOF_ROUT) { addHit(h[0], h[1], h[2], h[3], 0.026, tr); nETOF++; }
+      }
+      if (crossZ(z, nz, EEMC_Z0)) {
+        const h = at((EEMC_Z0 - z) / (nz - z)), hr = Math.hypot(h[0], h[1]);
+        if (hr > EEMC_RIN && hr < EEMC_ROUT) { calDep(EEMC, h[0], h[1], h[2], pt * ch, h[3], tr); stop = true; }
+      }
+      for (const Z of [-PT_Z0, PT_Z0]) if (crossZ(z, nz, Z)) {
+        const hr = Math.hypot(...at((Z - z) / (nz - z)).slice(0, 2));
+        if (hr > PT_RIN && hr < PT_ROUT) stop = true;                  // absorbed in the pole tip
+      }
+      for (const Z of [-EPD_Z, EPD_Z]) if (crossZ(z, nz, Z)) {
+        const h = at((Z - z) / (nz - z)), hr = Math.hypot(h[0], h[1]);
+        if (hr < EPD_R1) { if (hr > EPD_R0) { addHit(h[0], h[1], h[2], h[3], 0.022, tr); nEPD++; } fwd = true; }
+        stop = true;
+      }
+      x = nx; y = ny; z = nz; s3 = ns; alpha += da; turned += Math.abs(da);
+      if (stop || rn >= COIL_R0 || turned > 2.6 * Math.PI || Math.abs(z) > EPD_Z + 0.2) break;
+    }
+    // beyond the magnet: straight to the VPD (both sides) or the FCS (West)
+    if (fwd) {
+      const dx = Math.cos(alpha), dy = Math.sin(alpha), dz = sh;           // per unit transverse length
+      const go = (Z) => { const t = (Z - z) / dz; return [x + dx * t, y + dy * t, Z, s3 + t * ch]; };
+      if (z > 0) {
+        const f = go(FCS_Z), cal = fcsAt(f[0], f[1]);
+        if (cal) { pushSeg(x, y, z, s3, f[0], f[1], f[2], f[3]); calDep(cal, f[0], f[1], f[2], pt * ch, f[3], tr); s3 = f[3]; }
+        else { const v = go(VPD_Z), vr = Math.hypot(v[0], v[1]); if (vr > VPD_R0 && vr < VPD_R1) { pushSeg(x, y, z, s3, ...v); addHit(...v, 0.018, tr); s3 = v[3]; } }
+      } else {
+        const v = go(-VPD_Z), vr = Math.hypot(v[0], v[1]);
+        if (vr > VPD_R0 && vr < VPD_R1) { pushSeg(x, y, z, s3, ...v); addHit(...v, 0.018, tr); s3 = v[3]; }
+      }
+    }
+    if (tpcL > 0.4) { nTPC++; if (P.sp === 2 && q > 0) nPTPC++; }
+    tr.count = nv - tr.start;
+    maxPath = Math.max(maxPath, s3);
+    trks.push(tr);
+  }
+
+  // ---- neutral mesons → γγ, straight to BEMC / EEMC / FCS
+  let ng = 0;
+  const G = gBuf;
+  const MES = [{ m: 0.1350, n: nPi0, theta: 0.25, br: 0.988 }, { m: 0.5479, n: Math.round(0.11 * nPi0 * clamp01((rsSel - 2) / 6)), theta: 0.40, br: 0.394 }];
+  for (const M of MES) for (let k = 0; k < M.n; k++) {
+    if (rnd() > M.br) continue;
+    const pt = samplePt(M.theta), y = lab(yMes());
+    const phi = samplePhi(0, THREE.MathUtils.clamp(v2 * Math.min(pt / 0.7, 2.6), -0.15, 0.3));
+    const mT = Math.hypot(M.m, pt);
+    for (const [E, px, py, pz] of decayGG(M.m, mT * Math.cosh(y), pt * Math.cos(phi), pt * Math.sin(phi), mT * Math.sinh(y))) {
+      const pTg = Math.hypot(px, py); if (pTg < 1e-6 || ng >= MAXG) continue;
+      let t = BEMC_R / pTg, hit = null;                          // along momentum, t in m per GeV
+      let X = vx + px * t, Y = vy + py * t, Z = vz + pz * t;
+      if (Math.abs(Z) <= BEMC_ZF) hit = [BEMC, X, Y, Z];
+      else if (pz > 0) {
+        t = (EEMC_Z0 - vz) / pz; X = vx + px * t; Y = vy + py * t; Z = EEMC_Z0;
+        const r = Math.hypot(X, Y);
+        if (r > EEMC_RIN && r < EEMC_ROUT) hit = [EEMC, X, Y, Z];
+        else if (r < PT_RIN) { t = (FCS_Z - vz) / pz; X = vx + px * t; Y = vy + py * t; Z = FCS_Z; const cal = fcsAt(X, Y); if (cal) hit = [cal, X, Y, Z]; }
+      }
+      if (!hit) continue;
+      const L = Math.hypot(X - vx, Y - vy, Z - vz);
+      if (!deposit(hit[0], X, Y, Z, smear(hit[0], E), L, 0.25, 10)) continue;
+      const o = ng * 6;
+      G.position.set([vx, vy, vz, X, Y, Z], o);
+      G.pathT[ng * 2] = 0; G.pathT[ng * 2 + 1] = L;
+      G.gE[ng * 2] = G.gE[ng * 2 + 1] = Math.min(0.25 + 0.3 * E, 2.2);
+      maxPath = Math.max(maxPath, L);
+      ng++;
+    }
+  }
+  gGeo.setDrawRange(0, ng * 2);
+  for (const a of Object.values(gAttr)) a.needsUpdate = true;
+  const cal = buildTowers();
+
+  ev = { K, sys: S_, NA, NB, b, c: c * 100, npart, ncoll, eps2, psi2, v2, nucleons, su, sv, mx, my, vx, vy, vz,
+         trks, nv, nh, ng, nTOF, nEPD, nETOF, nTPC, nPTPC, nPprot, nMes, ...cal, maxPath: Math.min(maxPath, 8.5),
+         gVisA: Math.min(K.fxt ? K.gLab : K.gCM, 12), gVisB: K.fxt ? 1 : Math.min(K.gCM, 12) };
+  trkGeo.setDrawRange(0, nv);
+  hits.count = nh;
+  nucMesh.count = nucleons.length;
+  recolor();
+  aPos.needsUpdate = true; aPath.needsUpdate = true;
+  hT.needsUpdate = true; hits.instanceMatrix.needsUpdate = true;
+  evNo++;
+}
+
+function recolor() {
+  if (!ev) return;
+  for (const tr of ev.trks) {
+    const c = trackColor(tr, colorMode);
+    for (let i = tr.start; i < tr.start + tr.count; i++) { tCol[i * 3] = c.r; tCol[i * 3 + 1] = c.g; tCol[i * 3 + 2] = c.b; }
+    for (let i = tr.h0; i < tr.h0 + tr.nh; i++) { hC.array[i * 3] = c.r; hC.array[i * 3 + 1] = c.g; hC.array[i * 3 + 2] = c.b; }
+  }
+  aCol.needsUpdate = true; hC.needsUpdate = true;
+  legend();
+}
+
+/* ================= animation ================= */
+let simT = -1.7, paused = false, speed = 3, autoLoop = true;
+const dummy = new THREE.Object3D();
+const cLead = new THREE.Color(0x9fb2cf), cProt = new THREE.Color(0xc8b6ff), cPart = new THREE.Color(0xffb24a), cFlash = new THREE.Color(4, 2.6, 1.2);
+
+function updateNuclei(t) {
+  const rN = 0.85 * S;
+  ev.nucleons.forEach((n, i) => {
+    // collider: A (side +1) comes from −z towards West (+z), B from +z.  FXT: projectile A from +z (beam West→East), target B at rest.
+    let zc, g;
+    if (ev.K.fxt) { zc = n.side === 1 ? -V_NUC * t : 0; g = n.side === 1 ? ev.gVisA : 1; }
+    else { zc = n.side * V_NUC * t; g = n.side === 1 ? ev.gVisA : ev.gVisB; }
+    const zl = n.p[2] * S / g;
+    let sc = rN, col = n.prot ? cProt : cLead;
+    if (n.part) {
+      if (t > 0.12) sc = 0;
+      else if (t >= 0) { col = cFlash; sc = rN * 1.3; }
+      else if (t > -0.45) col = tmpC.copy(col).lerp(cPart, Math.min(1, (t + 0.45) / 0.3));
+    } else if (Math.abs(zc) > ZDC_Z) sc = 0;
+    dummy.position.set(ev.vx + n.p[0] * S, ev.vy + n.p[1] * S, ev.vz + zc + zl);
+    dummy.scale.set(sc, sc, sc * Math.min(1, 3 / g));
+    dummy.updateMatrix();
+    nucMesh.setMatrixAt(i, dummy.matrix);
+    nucMesh.setColorAt(i, col);
+  });
+  nucMesh.instanceMatrix.needsUpdate = true;
+  nucMesh.instanceColor.needsUpdate = true;
+}
+
+function updateFire(t) {
+  if (t < 0 || ev.npart < 2) { uFire.value = 0; fireGroup.visible = false; return; }
+  fireGroup.visible = true;
+  const env = THREE.MathUtils.smoothstep(t, 0, 0.06) * (1 - THREE.MathUtils.smoothstep(t, 0.45, 1.05));
+  uFire.value = env * Math.min(1, 0.35 + ev.npart / 150);
+  const ve = 0.75, f = S / S0;
+  fireGroup.position.set(ev.vx + ev.mx * S, ev.vy + ev.my * S, ev.vz - (ev.K.fxt ? f * 0.6 * t : 0));
+  fireGroup.rotation.set(0, 0, ev.psi2);
+  fire.scale.set(
+    1.6 * ev.su * S + f * ve * (1 + 2 * ev.v2) * t,
+    1.6 * ev.sv * S + f * ve * (1 - 2 * ev.v2) * t,
+    f * (0.04 + (ev.K.rs > 20 ? 1.3 : 0.8) * t));
+}
+
+const fmtE = rs => (rs >= 100 ? rs.toFixed(0) : rs.toFixed(1)) + ' GeV';
+const PHASES = [
+  [-0.15, 'Approach', () => ev.K.fxt
+    ? `${ev.NA.tag} beam (E = ${fxtElab(ev.K.rs).toFixed(2)} GeV/u, γ ≈ ${ev.K.gLab.toFixed(1)}) travels West→East onto the Au foil at z = 2.007 m. ${S < 1e-12 ? 'Nuclei at true size: raise Nuclei zoom to see them.' : 'Participants shown amber.'}`
+    : `${ev.NA.tag} and ${ev.NB.tag}, γ ≈ ${ev.K.gCM.toFixed(ev.K.gCM < 10 ? 1 : 0)} each (drawn at γ ≤ 12). ${S < 1e-12 ? 'Nuclei at true size: raise Nuclei zoom to see them.' : 'Participants shown amber.'}`],
+  [0.08, 'Impact', () => `b = ${ev.b.toFixed(1)} fm · N_part = ${ev.npart}, N_coll = ${ev.ncoll}, σ_NN = ${ev.K.sigNN.toFixed(0)} mb. ${ev.K.fxt ? 'Projectile spectators continue East; target spectators stay in the foil.' : 'Spectator neutrons continue to the ZDCs at ±18 m.'}`],
+  [0.32, () => ev.K.rs >= 7 ? 'QGP formation' : 'Dense baryonic matter', () => ev.K.rs >= 7
+    ? `Initial overlap eccentricity ε₂ = ${ev.eps2.toFixed(2)}. Baryon stopping is ${ev.K.rs > 60 ? 'partial: net protons sit near beam rapidity' : 'strong: net protons pile up at mid-rapidity'}.`
+    : `High-μ_B region of the QCD phase diagram: nearly full stopping; ε₂ = ${ev.eps2.toFixed(2)}, passage time of the nuclei is comparable to the expansion time.`],
+  [T0 + 0.15, 'Expansion & freeze-out', () => ev.v2 >= 0
+    ? `Pressure gradients convert ε₂ into in-plane flow, v₂ ≈ ${ev.v2.toFixed(3)}.${ev.K.v1p > 0.05 ? ` Strong directed flow of protons, dv₁/dy ≈ ${ev.K.v1p.toFixed(2)}.` : ''}`
+    : `Spectator shadowing ("squeeze-out"): v₂ ≈ ${ev.v2.toFixed(3)} < 0; protons show strong directed flow, dv₁/dy ≈ ${ev.K.v1p.toFixed(2)}.`],
+  [T0 + 3.0 / V_TRK, 'Tracking', () => `Helices in B = 0.5 T: R[m] = p_T/(0.3·B). ${ev.nTPC.toLocaleString()} tracks in the TPC${ev.K.fxt ? ' (boosted East by y_CM = ' + ev.K.yb.toFixed(2) + ')' : ''}; ${ev.nTOF} TOF${etofOn ? `, ${ev.nETOF} eTOF` : ''} and ${ev.nEPD} EPD hits.`],
+  [1e9, 'Calorimetry', () => `${ev.nTw.toLocaleString()} BEMC / EEMC / FCS towers above 100 MeV, ΣE = ${ev.sumE.toFixed(0)} GeV. Dashed: ${ev.ng} photons from π⁰, η → γγ.`],
+];
+let lastPhase = -1;
+function phaseUpdate(t) {
+  const i = PHASES.findIndex(p => t < p[0]);
+  if (i !== lastPhase) {
+    lastPhase = i; const nm = PHASES[i][1];
+    $('phaseName').textContent = typeof nm === 'function' ? nm() : nm; $('phaseNote').textContent = PHASES[i][2]();
+  }
+}
+
+function stats() {
+  const K = ev.K;
+  $('eyebrow').textContent = `RHIC · ${ev.sys.name} · ${K.fxt ? 'fixed target · ' : ''}toy MC`;
+  $('beamLine').innerHTML = `√s<sub>NN</sub> = ${fmtE(K.rs)}${K.fxt ? ` · E<sub>beam</sub> = ${fxtElab(K.rs).toFixed(2)} GeV/u · y<sub>CM</sub> = −${K.yb.toFixed(2)}` : ` · y<sub>beam</sub> = ±${K.yb.toFixed(2)}`} · B = 0.5 T`;
+  $('sEv').textContent = '#' + String(evNo).padStart(3, '0');
+  $('sCent').textContent = ev.c.toFixed(1) + '%';
+  $('sB').textContent = ev.b.toFixed(2);
+  $('sNp').textContent = ev.npart;
+  $('sNc').textContent = ev.ncoll.toLocaleString();
+  $('sNch').textContent = ev.nTPC.toLocaleString();
+  $('sEps').textContent = ev.eps2.toFixed(3);
+  $('sV2').textContent = ev.v2.toFixed(3);
+  $('sNp2').textContent = ev.nPTPC.toLocaleString();
+  $('sTw').textContent = ev.nTw.toLocaleString();
+  $('sSE').textContent = ev.sumE.toFixed(0);
+  $('sHits').textContent = `${ev.nTOF} / ${ev.nEPD}`;
+}
+
+function newEvent() {
+  generate(+$('iCent').value);
+  simT = -1.7; lastPhase = -1; stats();
+  tgtLbl.d.classList.toggle('tgt', ev.K.fxt);
+}
+function replay() { simT = -1.7; lastPhase = -1; }
+
+/* ---------------- legend ---------------- */
+function legend() {
+  const el = $('legend');
+  if (colorMode === 'pt') {
+    el.innerHTML = `<h2>Track p<sub>T</sub> (GeV/c)</h2>
+      <div class="ramp" style="background:linear-gradient(90deg,${PT_COLS.map(c => '#' + c.getHexString(THREE.SRGBColorSpace)).join(',')})"></div>
+      <div class="ticks">${PT_STOPS.map((p, i) => `<span style="left:${i * 25}%">${i === 4 ? '≥4' : p}</span>`).join('')}</div>`;
+  } else if (colorMode === 'charge') {
+    el.innerHTML = `<h2>Track charge</h2><div class="keys">
+      <span class="key"><i style="background:#ff7a59"></i>positive</span>
+      <span class="key"><i style="background:#4fa3ff"></i>negative</span></div>`;
+  } else {
+    el.innerHTML = `<h2>Species (MC truth)</h2><div class="keys">${SP.map(s => `<span class="key"><i style="background:#${s.col.getHexString(THREE.SRGBColorSpace)}"></i>${s.name}</span>`).join('')}</div>`;
+  }
+  const lg = v => (Math.log10(v / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]) * 100).toFixed(1);
+  el.insertAdjacentHTML('beforeend', `<h2 class="sub">BEMC / EEMC / FCS tower E (GeV)</h2>
+    <div class="ramp" style="background:linear-gradient(90deg,${E_COLS.map(c => '#' + c.getHexString(THREE.SRGBColorSpace)).join(',')})"></div>
+    <div class="ticks">${[0.1, 1, 10, 20].map(v => `<span style="left:${lg(v)}%">${v}</span>`).join('')}</div>
+    <div class="keys"><span class="key"><i class="dash"></i>γ (π⁰, η → γγ)</span><span class="key muted">height 10 cm/GeV</span></div>`);
+}
+
+/* ---------------- labels ---------------- */
+const mkLabel = (n, sub, p, cls = '') => {
+  const d = document.createElement('div'); d.className = 'lbl ' + cls;
+  d.innerHTML = `<b>${n}</b>${sub ? ' · ' + sub : ''}`;
+  $('labels').appendChild(d);
+  return { d, v: new THREE.Vector3(...p) };
+};
+const P = (r, phd, z) => [r * Math.cos(phd * D2R), r * Math.sin(phd * D2R), z];
+const LABELS = [
+  ['TPC', 'iTPC · r 0.5–2.0 m', [0, TPC_ROUT, -TPC_HL]],
+  ['TOF', 'r 2.16 m', P(TOF_R, -40, TOF_HL)],
+  ['BEMC', '|η| < 1', P(BEMC_R2, 150, 0.6)],
+  ['Magnet', '0.5 T solenoid', [0, BL_R1 + 0.02, -MAG_HL]],
+  ['MTD', '|η| < 0.5', P(MTD_R + 0.05, 36, 1.8)],
+  ['EEMC', '1.09 < η < 2', P(1.6, 200, EEMC_Z0)],
+  ['EPD', 'West', P(0.95, 60, EPD_Z)],
+  ['EPD', 'East', P(0.95, 60, -EPD_Z)],
+  ['FST', '', P(0.3, 120, FST_Z[1])],
+  ['FTT', 'sTGC', P(0.85, 135, FTT_Z[2])],
+  ['FCS', 'ECal + HCal', [1.0, 1.1, FCS_Z]],
+  ['VPD', '', [0, 0.18, -VPD_Z]],
+  ['ZDC', '+18 m', [0, 0.15, ZDC_Z]],
+  ['ZDC', '−18 m', [0, 0.15, -ZDC_Z]],
+  ['West', '+z', [0, 0, 11]],
+  ['East', '−z', [0, 0, -11]],
+].map(([n, sub, p]) => mkLabel(n, sub, p));
+const etofLbl = mkLabel('eTOF', 'East, optional', P(ETOF_ROUT, 200, ETOF_Z0));
+const tgtLbl = mkLabel('FXT target', 'Au foil, z = 2.007 m', [0, -0.06, FXT_Z]);
+LABELS.push(etofLbl, tgtLbl);
+const NUCL = [1, -1].map(side => ({ ...mkLabel('', '', [0, 0, 0], 'pb'), side }));
+const pv = new THREE.Vector3();
+function placeLabels() {
+  const w = innerWidth, h = innerHeight;
+  for (const L of NUCL) {
+    const N = L.side === 1 ? ev.NA : ev.NB;
+    L.d.innerHTML = `<b>${N.tag}</b>`;
+    const zc = ev.K.fxt ? (L.side === 1 ? -V_NUC * simT : 0) : L.side * V_NUC * simT;
+    L.v.set(ev.vx, ev.vy + 0.04 + 7 * S, ev.vz + zc + (ev.K.fxt && L.side === -1 ? -0.15 : 0));
+  }
+  etofLbl.d.hidden = !etofOn;
+  for (const L of [...LABELS, ...NUCL]) {
+    if (L === etofLbl && !etofOn) continue;
+    if (L.side && simT > 0) { L.d.hidden = true; continue; }
+    pv.copy(L.v).project(camera);
+    const vis = pv.z < 1 && Math.abs(pv.x) < 1.05 && Math.abs(pv.y) < 1.05;
+    L.d.hidden = !vis;
+    if (vis) L.d.style.transform = `translate(${(pv.x * 0.5 + 0.5) * w}px,${(-pv.y * 0.5 + 0.5) * h}px) translate(-50%,-100%)`;
+  }
+}
+
+/* ---------------- camera presets ---------------- */
+const VIEW_ZOOM = 1.2;
+const VIEWS = {
+  v3d: [[9.4, 5.6, 11.6], [0, 0, 1.2]], vBeam: [[0.001, 0.001, 15.5], [0, 0, 0]],
+  vSide: [[17.5, 0.8, 1.5], [0, 0, 1.5]], vFwd: [[-5.5, 3.0, 1.0], [0, 0, 4.5]],
+};
+let tween = null;
+function setView(id, instant) {
+  const k = (innerWidth / innerHeight < 1 ? 1.55 : 1) * VIEW_ZOOM;
+  const [pos, tgt] = VIEWS[id];
+  const to = new THREE.Vector3(...pos).multiplyScalar(k), tt = new THREE.Vector3(...tgt);
+  for (const b of Object.keys(VIEWS)) $(b).setAttribute('aria-pressed', b === id);
+  if (instant) { camera.position.copy(to); controls.target.copy(tt); return; }
+  tween = { from: camera.position.clone(), to, t: 0, tf: controls.target.clone(), tt };
+}
+
+/* ---------------- UI wiring ---------------- */
+$('iSys').innerHTML = Object.entries(SYSTEMS).map(([k, s]) => `<option value="${k}">${s.name}</option>`).join('');
+function fillEnergies() {
+  const S_ = SYSTEMS[sysKey];
+  $('iE').innerHTML = S_.E.map(([e, note]) => `<option value="${e}">${e} GeV${S_.fxt ? ` · E_beam ${fxtElab(e).toFixed(2)} GeV/u` : note ? ' · ' + note : ''}</option>`).join('');
+  rsSel = S_.E[0][0];
+  if (S_.fxt) { rsSel = 3.0; $('iE').value = '3'; }
+}
+$('iSys').onchange = e => { sysKey = e.target.value; fillEnergies(); newEvent(); };
+$('iE').onchange = e => { rsSel = +e.target.value; newEvent(); };
+fillEnergies();
+
+$('hudToggle').onclick = () => { const c = $('hud').classList.toggle('collapsed'); $('hudToggle').setAttribute('aria-expanded', !c); };
+$('bNext').onclick = newEvent;
+$('ctlToggle').onclick = () => { const c = $('controls').classList.toggle('collapsed'); $('ctlToggle').setAttribute('aria-expanded', !c); };
+
+let lightTheme = false;
+function applyTheme(light) {
+  lightTheme = light;
+  document.documentElement.classList.toggle('light', light);
+  $('cLight').checked = light;
+  const bg = light ? 0xeef1f6 : 0x060a13;
+  renderer.setClearColor(bg, 1); scene.fog.color.setHex(bg);
+  uLight.value = light ? 1 : 0;
+  for (const m of themed) { m.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; m.needsUpdate = true; }
+  for (const m of lineMats) {
+    m.color.copy(m.userData.base.color).multiplyScalar(light ? 0.55 : 1);
+    m.opacity = Math.min(1, m.userData.base.opacity * (light ? 1.7 : 1));
+  }
+}
+$('cLight').onchange = e => applyTheme(e.target.checked);
+$('bReplay').onclick = replay;
+$('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? 'Play' : 'Pause'; $('bPause').setAttribute('aria-pressed', paused); };
+$('iCent').oninput = e => { $('oCent').textContent = `${e.target.value}–${+e.target.value + 5}%`; };
+$('iCent').onchange = newEvent;
+$('iColor').onchange = e => { colorMode = e.target.value; recolor(); };
+$('iSpeed').oninput = e => { speed = +e.target.value; $('oSpeed').textContent = speed.toFixed(1) + '×'; };
+$('cDet').onchange = e => { det.visible = e.target.checked; };
+$('cEtof').onchange = e => { etofOn = e.target.checked; etofG.visible = etofOn; newEvent(); };
+$('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
+$('cLoop').onchange = e => { autoLoop = e.target.checked; };
+$('cRot').onchange = e => { controls.autoRotate = e.target.checked; };
+const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+function fmtLen(m) {
+  const U = [[1, 'm'], [1e-2, 'cm'], [1e-3, 'mm'], [1e-6, 'µm'], [1e-9, 'nm'], [1e-12, 'pm'], [1e-15, 'fm']];
+  const [s, u] = U.find(([s]) => m >= s * 0.999) || U[U.length - 1];
+  const v = m / s;
+  return `${v < 10 ? v.toFixed(1) : v.toFixed(0)} ${u}`;
+}
+function setZoom(lg) {
+  const m = 10 ** lg;
+  S = m * 1e-15;
+  const e = Math.floor(lg + 1e-9), mant = m / 10 ** e;
+  const mag = m < 1.05 ? '1× (true size)' : e < 1 ? `${m.toFixed(1)}×` : `${mant.toFixed(1)}×10${String(e).split('').map(c => SUP[c]).join('')}`;
+  $('oZoom').textContent = `${mag} · R_Au ${fmtLen(7.0e-15 * m)}`;
+}
+$('iZoom').max = Math.log10(MAG0).toFixed(2);
+$('iZoom').oninput = e => setZoom(+e.target.value);
+setZoom(+$('iZoom').value);
+for (const id of Object.keys(VIEWS)) $(id).onclick = () => setView(id);
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); $('bPause').click(); }
+  if (e.key === 'n') newEvent();
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+// URL parameters (handy for links / tests): ?sys=AuAuFXT&e=3&cent=0&t=6
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('sys') && SYSTEMS[q.get('sys')]) { sysKey = q.get('sys'); $('iSys').value = sysKey; fillEnergies(); }
+  if (q.has('e') && SYSTEMS[sysKey].E.some(([e]) => e === +q.get('e'))) { rsSel = +q.get('e'); $('iE').value = q.get('e'); }
+  if (q.has('cent')) { $('iCent').value = q.get('cent'); $('iCent').dispatchEvent(new Event('input')); }
+  if (q.has('etof')) { etofOn = q.get('etof') !== '0'; $('cEtof').checked = etofOn; etofG.visible = etofOn; }
+  if (q.has('t')) { paused = true; autoLoop = false; controls.autoRotate = false; window.__fixT = +q.get('t'); }
+  if (q.has('view') && VIEWS[q.get('view')]) window.__view = q.get('view');
+}
+
+/* ---------------- go ---------------- */
+setView(window.__view || 'v3d', true);
+newEvent();
+if (window.__fixT !== undefined) simT = window.__fixT;
+const clock = new THREE.Clock();
+let shotReq = null;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!paused) simT += dt * speed;
+  updateNuclei(simT);
+  updateFire(simT);
+  uT.value = Math.max(0, simT - T0) * V_TRK;
+  phaseUpdate(simT);
+  if (autoLoop && !paused && simT > T0 + ev.maxPath / V_TRK + 2.6) newEvent();
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 0.9);
+    const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
+    camera.position.lerpVectors(tween.from, tween.to, e);
+    controls.target.lerpVectors(tween.tf, tween.tt, e);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+  if (!$('labels').hidden) placeLabels();
+  if (post && !lightTheme) post.render(); else renderer.render(scene, camera);
+  if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
+});
+
+/* ---------------- screenshot ---------------- */
+let downloads = null;
+const inViewer = typeof window.claude?.use === 'function';
+$('bShot').hidden = false;
+if (inViewer) (async () => { try { downloads = await window.claude.use('downloads'); } catch (e) { downloads = null; } })();
+function saveLocally(blob, filename) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function composeShot(done) {
+  const src = renderer.domElement, c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const k = c.width / innerWidth, pad = 18 * k;
+  g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue('--ink').trim(); g.textBaseline = 'bottom';
+  g.fillText(`STAR · ${ev.sys.name} √sNN = ${fmtE(ev.K.rs)} · toy MC`, pad, c.height - pad - 18 * k);
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = css.getPropertyValue('--muted').trim();
+  g.fillText(`Event #${String(evNo).padStart(3, '0')} · centrality ${ev.c.toFixed(1)}% · b = ${ev.b.toFixed(2)} fm · Npart ${ev.npart} · ${ev.nTPC} TPC tracks · ${ev.nTw} towers, ΣE ${ev.sumE.toFixed(0)} GeV`, pad, c.height - pad);
+  c.toBlob(done, 'image/png');
+}
+$('bShot').onclick = () => {
+  const b = $('bShot');
+  shotReq = async blob => {
+    if (!blob) { b.textContent = 'Screenshot failed'; return; }
+    const filename = `star-${sysKey}-${rsSel}-event-${String(evNo).padStart(3, '0')}.png`;
+    if (!downloads) {
+      if (inViewer) { b.textContent = 'Save unavailable'; setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return; }
+      saveLocally(blob, filename); b.textContent = 'Saved';
+      setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return;
+    }
+    try { await downloads.save({ filename, data: blob }); b.textContent = 'Saved'; }
+    catch (e) {
+      b.textContent = e?.code === 'declined' ? 'Save screenshot' : 'Save unavailable';
+      if (['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e?.code)) b.hidden = true;
+    }
+    setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800);
+  };
+};
+
+function fail(msg) {
+  const d = document.createElement('div'); d.id = 'fail'; d.textContent = msg; app.prepend(d);
+  $('phaseName').textContent = 'Renderer unavailable'; $('phaseNote').textContent = msg;
+}
+</script>
+
+</body>
+</html>
