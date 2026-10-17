@@ -249,6 +249,7 @@ input[type=checkbox]{accent-color:var(--amber)}
     </div>
     <div class="grp">
       <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cCaps" type="checkbox" checked>End-caps</label>
       <label class="chk"><input id="cCut" type="checkbox">Cutaway</label>
       <label class="chk"><input id="cSegs" type="checkbox" checked>Segments</label>
       <label class="chk"><input id="cBkg" type="checkbox" checked>Atomic bkg</label>
@@ -755,7 +756,7 @@ const cryMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: 
 }
 det.add(new THREE.Mesh(cryGeo, cryMat));
 const edgeOnA = [], edgeMats = [];
-let capOnF = null;
+let capOnF = null; const capObjs = [];
 function edgeLines(v, hemi, ids, hex, op) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
@@ -766,7 +767,7 @@ function edgeLines(v, hemi, ids, hex, op) {
   m.colorNode = color(hex).mul(mix(float(1), float(0.5), uLight));
   m.opacityNode = float(op).mul(mix(float(1), float(1.8), uLight)).mul(uDet).mul(float(1).sub(uCut.mul(attribute('hemi', 'float')).mul(0.92))).mul(attribute('on', 'float'));
   themed.push(m); edgeMats.push(m);
-  det.add(new THREE.LineSegments(g, m));
+  const ls = new THREE.LineSegments(g, m); det.add(ls); return ls;
 }
 edgeLines(edgeHi, edgeHemiHi, edgeOnHi, '#8fb0d8', 0.22);
 edgeLines(edgeLo, edgeHemiLo, edgeOnLo, '#8fb0d8', 0.06);
@@ -824,10 +825,10 @@ for (let m = 0; m < 30; m++) {
   m.colorNode = color('#c9d3e2').mul(mix(float(1), float(0.5), uLight));
   m.opacityNode = fres.mul(0.07).add(0.006).mul(uDet).mul(float(1).sub(uCut.mul(attribute('hemi', 'float')).mul(0.95))).mul(mix(float(1), float(1.8), uLight)).mul(attribute('on', 'float'));
   themed.push(m);
-  det.add(new THREE.Mesh(g, m));
+  capObjs.push(new THREE.Mesh(g, m)); det.add(capObjs[0]);
   capOnF = on;
 }
-edgeLines(capV, capHemi, capIds, '#c9d3e2', 0.15);
+capObjs.push(edgeLines(capV, capHemi, capIds, '#c9d3e2', 0.15));
 
 // pentagon holes at the front-face radius
 {
@@ -1239,6 +1240,7 @@ $('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused
 $('iSpeed').oninput = e => { speed = +e.target.value; $('oSpeed').textContent = speed.toFixed(1) + '×'; };
 $('cDet').onchange = e => { uDet.value = e.target.checked ? 1 : 0; };
 $('cCut').onchange = e => { uCut.value = e.target.checked ? 1 : 0; };
+$('cCaps').onchange = e => { for (const o of capObjs) o.visible = e.target.checked; };
 $('cSegs').onchange = e => { uSegs.value = e.target.checked ? 1 : 0; };
 $('cBkg').onchange = e => { bkgOn = e.target.checked; clearSpec(); };
 $('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
@@ -1277,6 +1279,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
   if (q.has('cfg')) { nQuads = +q.get('cfg') === 20 ? 20 : 30; $('iCfg').value = nQuads; setConfig(nQuads); applyConfig(); }
   if (q.has('color')) { colorMode = q.get('color'); $('iColor').value = colorMode; }
   if (q.has('shell')) { $('iShell').value = q.get('shell'); applyShellColours(q.get('shell')); }
+  if (q.get('caps') === '0') { $('cCaps').checked = false; for (const o of capObjs) o.visible = false; }
   if (q.has('cut')) { $('cCut').checked = true; uCut.value = 1; }
   if (q.has('t')) { paused = true; autoLoop = false; controls.autoRotate = false; window.__fixT = +q.get('t'); }
   if (q.has('view') && VIEWS[q.get('view')]) window.__view = q.get('view');
