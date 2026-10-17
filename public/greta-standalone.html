@@ -1150,6 +1150,12 @@ function setView(id, instant) {
 /* ---------------- UI wiring ---------------- */
 let paused = false, speed = 5, autoLoop = true, phys = -1;
 $('iRx').innerHTML = Object.entries(PRESETS).map(([k, p]) => `<option value="${k}">${p.name}${p.src ? '' : ` · β ≈ ${p.beta.toFixed(2)}`}</option>`).join('');
+// browsers restore form values on reload; reset every control to its HTML default so UI and state agree
+for (const el of document.querySelectorAll('#controls input, #controls select')) {
+  if (el.type === 'checkbox') el.checked = el.defaultChecked;
+  else if (el.tagName === 'SELECT') { const o = [...el.options].find(o => o.defaultSelected) || el.options[0]; el.value = o.value; }
+  else el.value = el.defaultValue;
+}
 function rxChanged(keepBeta) {
   const P = PRESETS[rxKey];
   if (!keepBeta) { betaSel = P.beta; $('iBeta').value = betaSel; $('oBeta').textContent = betaSel.toFixed(2); }
