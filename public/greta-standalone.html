@@ -1,0 +1,1305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>GRETA Event Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGPU event display; glass HUD top-left, legend + spectrum top-right, control rail at the bottom. Single dark theme by default (event-display convention). */
+:root{
+  color-scheme: dark;
+  --void:#060a13;
+  --panel:rgba(9,15,28,.74);
+  --ink:#dfe6f3;
+  --muted:#8796b1;
+  --line:rgba(140,165,205,.20);
+  --amber:#ffb24a;
+  --steel:#6f8db8;
+  --btn:rgba(120,150,200,.10);
+  --on-accent:#1a1205;
+  --gamma:#fff0b8;
+  --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+html.light{
+  color-scheme: light;
+  --void:#eef1f6;
+  --panel:rgba(252,253,255,.86);
+  --ink:#172033;
+  --muted:#56637c;
+  --line:rgba(40,60,100,.20);
+  --amber:#b86400;
+  --steel:#41618f;
+  --btn:rgba(40,70,120,.07);
+  --on-accent:#ffffff;
+  --gamma:#9a6a00;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:12px}
+#app{position:fixed;inset:0}
+#app canvas.gl{display:block;width:100%;height:100%;touch-action:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.lbl b{color:var(--ink);font-weight:500}
+.lbl.ion{color:var(--amber);border-bottom-color:var(--amber);text-transform:none;letter-spacing:.04em}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#hud{top:calc(16px + env(safe-area-inset-top,0px));left:16px;width:min(340px,calc(100% - 32px));padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 120px);overflow:auto}
+.eyebrow{font:500 10px/1.3 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--amber)}
+h1{margin:0;font:600 30px/1 var(--display);letter-spacing:.01em;text-wrap:balance}
+#hudToggle{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;border-radius:3px}
+#hudToggle:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.chev{font-size:16px;color:var(--muted);transition:transform .2s}
+#hud.collapsed .chev{transform:rotate(-90deg)}
+.hud-body{display:flex;flex-direction:column;gap:10px}
+#hud.collapsed .hud-body,#hud.collapsed details{display:none}
+.beam{color:var(--muted);font-size:11px;line-height:1.45}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;margin:0}
+.stats div{min-width:0}
+.stats dt{font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.stats dd{margin:2px 0 0;font:600 19px/1.1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phase{border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:3px}
+#phaseName{font:600 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+#phaseNote{color:var(--muted);font-size:11px;line-height:1.45}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;color:var(--muted);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+summary:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+details p,details li{color:var(--muted);font-size:10.5px;line-height:1.5;margin:6px 0 0}
+details ul{margin:4px 0 0;padding-left:16px}
+details i{color:var(--ink);font-style:normal}
+#side{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:300px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 120px)}
+#side .panel{position:relative}
+#legend{padding:10px 12px}
+#legend h2,#spec h2{margin:0 0 8px;font:500 10.5px/1.2 var(--mono);letter-spacing:.03em;color:var(--muted)}
+.ramp{height:8px;border-radius:2px}
+.ticks{position:relative;height:14px;margin-top:4px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.ticks span:first-child{transform:none}
+.ticks span:last-child{transform:translateX(-100%)}
+.keys{display:flex;flex-wrap:wrap;gap:6px 12px}
+.key{display:flex;align-items:center;gap:6px}
+.key i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.key i.dash{background:repeating-linear-gradient(90deg,var(--gamma) 0 3px,transparent 3px 6px)}
+.key i.seg{height:8px;width:10px;border:1.5px solid var(--amber);border-radius:1px;background:transparent}
+.key.muted{color:var(--muted)}
+#legend h2.sub{margin-top:12px}
+#legend .keys{margin-top:6px}
+details a{color:var(--ink)}
+#spec{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+#specCv{width:100%;height:150px;display:block}
+.spec-bar{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.spec-bar button{padding:5px 7px;font-size:10.5px}
+#effTab{width:100%;border-collapse:collapse;font-size:10.5px;font-variant-numeric:tabular-nums}
+#effTab th{font-weight:500;color:var(--muted);text-align:right;padding:2px 3px;border-bottom:1px solid var(--line)}
+#effTab td{text-align:right;padding:2px 3px}
+#effTab th:first-child,#effTab td:first-child{text-align:left}
+#specNote{color:var(--muted);font-size:10px;line-height:1.4}
+#controls{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#controls.collapsed{right:auto;max-width:calc(100% - 32px)}
+.ctl-bar,.ctl-body{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.ctl-bar{gap:6px 8px}
+.ctl-bar label.chk{margin-left:6px}
+#controls.collapsed .ctl-body{display:none}
+#ctlToggle .chev{font-size:12px;margin-left:4px;display:inline-block;transition:transform .2s}
+#controls.collapsed #ctlToggle .chev{transform:rotate(180deg)}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grp>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button,select{font:500 11.5px/1 var(--mono);color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:4px;padding:7px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--steel)}
+button.primary{background:var(--amber);color:var(--on-accent);border-color:var(--amber);font-weight:600}
+button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+#controls select{max-width:100%}
+input[type=range]{accent-color:var(--amber);width:120px}
+output{font-variant-numeric:tabular-nums;min-width:5.5ch;color:var(--ink)}
+label.chk{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--ink)}
+input[type=checkbox]{accent-color:var(--amber)}
+#fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-inline:16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+@media (max-width:900px){
+  #side{display:none}
+  #hud{padding:10px 12px;gap:7px}
+  h1{font-size:22px}
+  .stats dd{font-size:16px}
+  .hide-sm{display:none}
+  #controls,.ctl-body{gap:8px 12px}
+  input[type=range]{width:96px}
+}
+@media (max-height:640px){ details{display:none} #spec{display:none} }
+</style>
+
+<div id="app">
+  <div id="labels"></div>
+
+  <section class="panel collapsed" id="hud" aria-label="Event summary">
+    <div class="eyebrow" id="eyebrow">FRIB · GRETA · toy MC</div>
+    <h1><button id="hudToggle" type="button" aria-expanded="false" aria-controls="hudBody">GRETA Event Display<span class="chev" aria-hidden="true">▾</span></button></h1>
+    <div id="hudBody" class="hud-body">
+    <div class="beam" id="beamLine">—</div>
+    <dl class="stats">
+      <div><dt>Event</dt><dd id="sEv">—</dd></div>
+      <div><dt>β (emission)</dt><dd id="sBeta">—</dd></div>
+      <div><dt>M<sub>γ</sub> emitted</dt><dd id="sMg">—</dd></div>
+      <div><dt>γ reaching Ge</dt><dd id="sMd">—</dd></div>
+      <div><dt>Full-energy γ</dt><dd id="sFull">—</dd></div>
+      <div><dt>Interactions</dt><dd id="sInt">—</dd></div>
+      <div class="hide-sm"><dt>Crystals hit</dt><dd id="sCry">—</dd></div>
+      <div class="hide-sm"><dt>Segments hit</dt><dd id="sSeg">—</dd></div>
+      <div class="hide-sm"><dt>ΣE Ge (keV)</dt><dd id="sSum">—</dd></div>
+      <div><dt>Tracked γ</dt><dd id="sTrk">—</dd></div>
+      <div class="hide-sm"><dt>1st point OK</dt><dd id="sOk">—</dd></div>
+      <div class="hide-sm"><dt>Quads</dt><dd id="sQuads">—</dd></div>
+    </dl>
+    </div>
+    <div class="phase" aria-live="polite">
+      <span id="phaseName">Loading</span>
+      <span id="phaseNote">Initialising the renderer…</span>
+    </div>
+    <details>
+      <summary>Model &amp; references</summary>
+      <ul>
+        <li><i>Array</i>. GRETA (Gamma-Ray Energy Tracking Array): 120 HPGe (high-purity germanium) crystals in 30 quad modules (2 type-A + 2 type-B irregular-hexagon crystals each), two hemispheres of 15 quads, ≈ 80% of 4π. Close-packed on a geodesic shell of 120 hexagons + 12 pentagons (here the chiral Goldberg tiling GP(3,1), T = 13, with the beam through two opposite pentagons). Quads are grouped on the 30 icosahedron edges — an approximation of the real module placement. Completed at Berkeley Lab Aug 2025; commissioned at FRIB (Facility for Rare Isotope Beams) and declared ready for science July 2026 (<a href="https://frib.msu.edu/news-center/news/greta-completes-commissioning-frib" target="_blank" rel="noopener">FRIB</a>, <a href="https://www.ans.org/news/2026-07-31/article-8262/greta-ready-for-full-scientific-operations/" target="_blank" rel="noopener">ANS</a>).</li>
+        <li><i>Crystals</i>: 90 mm long, 80 mm Ø cylindrical rear tapering to an irregular hexagonal front, 36-fold segmented (6 azimuthal wedges × 6 longitudinal slices; slice depths 8/14/24/38/54/90 mm here, approximate) plus the core contact (<a href="https://greta.lbl.gov/technology" target="_blank" rel="noopener">GRETA design</a>; arXiv:2512.12484). Front faces at R ≈ 18.5 cm from the target; 2.5 mm dead gap per face for capsule + can. Entry/exit rings (5 quads around each beam pentagon) are removable: 20-quad configuration as in front of the S800 before the HRS (High Rigidity Spectrometer).</li>
+        <li><i>Response</i>: γ transport in Ge only (no Al/cryostat material), photoabsorption μ<sub>pe</sub>/ρ ≈ 0.40 (E/100 keV)<sup>−3.1</sup> cm²/g, Klein–Nishina Compton, pair production above 1022 keV with both 511 keV photons tracked (attenuation approximated to NIST XCOM at the 10–20% level). Electron ranges ignored. Interactions in one segment merged (energy-weighted), as in signal decomposition; positions smeared by σ = 2 mm per coordinate (GRETINA: σ ≲ 2 mm). Crystal energies smeared with FWHM² = 1.16 + 0.0027·E[keV] keV² (≈ 1.2 keV at 122 keV, 2.2 keV at 1332 keV, GRETA acceptance-test means).</li>
+        <li><i>Tracking</i>: cone clustering (20° about the target), then all orderings of each cluster (≤ 7 points) scored by the Compton figure of merit χ² = Σ[(E′<sub>geo</sub> − E′<sub>meas</sub>)/σ]²; with an effective 6 mm position error (segment merging + resolution); clusters with χ²/ν &gt; 5 rejected, single-point clusters kept if E &lt; 1.5 MeV (after Deleplanque et al., NIM A 430, 292, 1999; Lee, Deleplanque, Vetter, Rep. Prog. Phys. 66, 1095, 2003). Doppler correction E₀ = E<sub>lab</sub>·γ(1 − β cos θ) with θ to the first point (tracked) or to the crystal centre (non-tracking reference).</li>
+        <li><i>Sources</i>: fast beams at β ≈ 0.4 on a ≈1 mm ⁹Be target (β spread ±0.02 through the target, nominal β used for the correction); level energies: ³²Mg 885 / 1438 keV (Motobayashi et al., PLB 346, 9, 1995), ⁴²Si 742 / 1431 keV (Takeuchi et al., PRL 109, 182501, 2012), ⁵⁴Ca 2043 keV (Steppenbeck et al., Nature 502, 207, 2013); lifetimes rough estimates. ReA rotational band: generic E(I→I−2) = 11·(4I − 2) keV plus a few statistical γ, β = 0.03. ⁶⁰Co 1173/1332 keV. No passive material, so the efficiencies shown are upper-limit toy values. Toy model — not GEANT4 / not the GRETA simulation.</li>
+      </ul>
+    </details>
+  </section>
+
+  <div id="side">
+    <aside class="panel" id="legend" aria-label="Colour legend"></aside>
+    <section class="panel" id="spec" aria-label="Accumulated spectrum">
+      <h2 id="specTitle">Accumulated spectrum</h2>
+      <canvas id="specCv" aria-label="Gamma-ray energy spectrum"></canvas>
+      <div class="spec-bar">
+        <button id="hTrk" aria-pressed="true">Tracked</button>
+        <button id="hCry" aria-pressed="true">Crystal</button>
+        <button id="hLab" aria-pressed="false">Lab</button>
+        <button id="hLog" aria-pressed="true">log</button>
+        <button id="hRun">+1000 ev</button>
+        <button id="hClr">Clear</button>
+      </div>
+      <table id="effTab"></table>
+      <div id="specNote"></div>
+    </section>
+  </div>
+
+  <section class="panel collapsed" id="controls" aria-label="Controls">
+    <div class="ctl-bar">
+      <button id="ctlToggle" type="button" aria-expanded="false" aria-controls="ctlBody">Controls<span class="chev" aria-hidden="true">▾</span></button>
+      <button id="bNext" class="primary">New event</button>
+      <button id="bReplay">Replay</button>
+      <button id="bPause" aria-pressed="false">Pause</button>
+      <button id="bShot" hidden>Save screenshot</button>
+      <label class="chk"><input id="cLight" type="checkbox">Light background</label>
+    </div>
+    <div class="ctl-body" id="ctlBody">
+    <div class="grp">
+      <span>Source</span>
+      <select id="iRx" aria-label="Reaction / source"></select>
+    </div>
+    <div class="grp" id="gBeta">
+      <span>β</span>
+      <input id="iBeta" type="range" min="0" max="0.6" step="0.01" value="0.4" aria-label="Recoil velocity v/c">
+      <output id="oBeta">0.40</output>
+    </div>
+    <div class="grp" id="gMono" hidden>
+      <span>E<sub>γ</sub></span>
+      <select id="iMono" aria-label="Mono-energetic gamma energy (keV)">
+        <option>122</option><option>344</option><option>662</option><option selected>1000</option><option>1332</option><option>2000</option><option>4000</option><option>8000</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>Array</span>
+      <select id="iCfg" aria-label="Array configuration">
+        <option value="30">30 quads (4π)</option>
+        <option value="20">20 quads (no entry/exit rings)</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>γ colour</span>
+      <select id="iColor" aria-label="Gamma-ray track colour mode">
+        <option value="trans">Transition</option>
+        <option value="track">Tracking result</option>
+        <option value="energy">γ energy</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>Shell</span>
+      <select id="iShell" aria-label="Crystal colouring">
+        <option value="type">Type A / B</option>
+        <option value="module">Quad module</option>
+        <option value="hemi">Hemisphere</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span>View</span>
+      <button id="v3d" aria-pressed="true">3D</button>
+      <button id="vBeam" aria-pressed="false">Beam axis</button>
+      <button id="vSide" aria-pressed="false">Side</button>
+      <button id="vIn" aria-pressed="false">Inside</button>
+    </div>
+    <div class="grp">
+      <span>Speed</span>
+      <input id="iSpeed" type="range" min="0.2" max="5" step="0.1" value="1" aria-label="Playback speed">
+      <output id="oSpeed">1.0×</output>
+    </div>
+    <div class="grp">
+      <label class="chk"><input id="cDet" type="checkbox" checked>Detector</label>
+      <label class="chk"><input id="cCut" type="checkbox">Cutaway</label>
+      <label class="chk"><input id="cSegs" type="checkbox" checked>Segments</label>
+      <label class="chk"><input id="cBkg" type="checkbox" checked>Atomic bkg</label>
+      <label class="chk"><input id="cLbl" type="checkbox" checked>Labels</label>
+      <label class="chk"><input id="cLoop" type="checkbox" checked>Auto-loop</label>
+      <label class="chk"><input id="cRot" type="checkbox" checked>Orbit</label>
+    </div>
+    </div>
+  </section>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.webgpu.js",
+  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.tsl.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three/webgpu';
+import { uniform, attribute, float, vec3, color, mix, step, smoothstep, exp, abs, dot, fract, max, clamp,
+         positionLocal, normalView, positionViewDirection, pass } from 'three/tsl';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+/*PHYS-BEGIN*/
+/* ================= GRETA geometry (metres; +z = beam direction, +y = up) =================
+   Geodesic GP(3,1) tiling, generated offline: crystal axes (C), cell corners on the unit sphere (V, 6 per crystal),
+   quad module id (M, 0–29, one per icosahedron edge), crystal shape type (T: 0 = A, 1 = B), the 12 pentagon holes (PC, PV)
+   and module mid-directions (MID). Beam axis passes through the pentagons at ±z. */
+const GEO = {"C":[0.7622,-0.3116,0.5674,0.525,-0.5432,0.6553,0.226,-0.7109,0.666,0.5399,-0.2207,0.8123,0.255,-0.4328,0.8646,0.2541,-0.1039,0.9616,-0.2704,-0.0469,-0.9616,-0.5747,-0.0996,-0.8123,-0.8113,-0.1407,-0.5674,-0.342,-0.368,-0.8646,-0.6294,-0.4178,-0.6553,-0.3734,-0.6458,-0.666,-0.6063,-0.4346,0.666,-0.3329,-0.3763,0.8646,-0.0203,-0.2737,0.9616,-0.3544,-0.6671,0.6553,-0.0431,-0.5817,0.8123,-0.0608,-0.8212,0.5674,-0.7999,-0.5661,0.1993,-0.7442,-0.6557,-0.1271,-0.601,-0.6682,-0.4385,-0.9315,-0.3613,-0.0424,-0.8258,-0.4156,-0.3812,-0.9535,-0.1141,-0.279,-0.6064,-0.6634,0.4385,-0.333,-0.8625,0.3812,-0.0205,-0.9601,0.279,-0.58,-0.8047,0.1271,-0.2687,-0.9623,0.0424,-0.4853,-0.8513,-0.1993,-0.7998,-0.1959,0.5674,-0.744,0.1309,0.6553,-0.6007,0.4423,0.666,-0.5665,-0.1388,0.8123,-0.4607,0.2003,0.8646,-0.2666,-0.0653,0.9616,-0.9194,-0.2772,0.279,-0.9982,-0.0418,0.0424,-0.9596,0.1985,-0.1993,-0.9231,0.0502,0.3812,-0.9445,0.3029,0.1271,-0.8183,0.3717,0.4385,0.2351,0.708,0.666,0.0481,0.5001,0.8646,-0.1445,0.2334,0.9616,-0.1054,0.748,0.6553,-0.307,0.4959,0.8123,-0.4335,0.7001,0.5674,0.5809,0.7647,0.279,0.783,0.6206,0.0424,0.893,0.4034,-0.1993,0.7764,0.502,0.3812,0.9422,0.3101,0.1271,0.8805,0.1803,0.4385,0.5319,0.6286,0.5674,0.6788,0.3314,0.6553,0.746,-0.0048,0.666,0.3767,0.4452,0.8123,0.4905,0.1088,0.8646,0.1773,0.2095,0.9616,0.4498,-0.7781,-0.4385,0.1401,-0.9138,-0.3812,-0.1861,-0.9421,-0.279,0.3936,-0.9104,-0.1271,0.0558,-0.9975,-0.0424,0.2912,-0.9357,0.1993,0.8384,-0.4682,-0.279,0.966,-0.2552,-0.0424,0.9799,-0.0122,0.1993,0.9124,-0.1492,-0.3812,0.9875,0.093,-0.1271,0.879,0.1873,-0.4385,0.6597,-0.7247,-0.1993,0.5861,-0.8002,0.1271,0.4435,-0.7817,0.4385,0.8321,-0.5529,0.0424,0.7173,-0.5832,0.3812,0.9067,-0.3162,0.279,0.4988,-0.5547,-0.666,0.2443,-0.439,-0.8646,-0.039,-0.2717,-0.9616,0.2029,-0.7277,-0.6553,-0.0828,-0.5773,-0.8123,-0.1169,-0.8151,-0.5674,0.739,-0.3631,-0.5674,0.7547,-0.0319,-0.6553,0.6817,0.303,-0.666,0.5235,-0.2572,-0.8123,0.493,0.0967,-0.8646,0.2463,-0.121,-0.9616,-0.4031,0.8716,-0.279,-0.6315,0.7742,-0.0424,-0.7856,0.5858,0.1993,-0.6504,0.657,-0.3812,-0.8536,0.5052,-0.1271,-0.8212,0.3651,-0.4385,-0.3845,0.7281,-0.5674,-0.5918,0.4694,-0.6553,-0.7296,0.1555,-0.666,-0.2723,0.5158,-0.8123,-0.4557,0.2116,-0.8646,-0.1282,0.2427,-0.9616,-0.0775,0.7419,-0.666,0.0604,0.4987,-0.8646,0.1912,0.1969,-0.9616,0.2636,0.7079,-0.6553,0.4064,0.4184,-0.8123,0.5737,0.5907,-0.5674,-0.1077,0.974,-0.1993,-0.0038,0.9919,0.1271,0.1006,0.8931,0.4385,-0.3482,0.9365,0.0424,-0.2375,0.8935,0.3812,-0.5477,0.7888,0.279,0.0935,0.8939,-0.4385,0.4238,0.8216,-0.3812,0.7043,0.6527,-0.279,0.2167,0.9679,-0.1271,0.5412,0.8398,-0.0424,0.3144,0.9281,0.1993],"V":[0.8108,-0.1397,0.5684,0.6956,-0.1824,0.6949,0.6217,-0.366,0.6925,0.6812,-0.4887,0.5451,0.8105,-0.4113,0.417,0.8652,-0.245,0.4375,0.6217,-0.366,0.6925,0.4497,-0.4078,0.7947,0.3423,-0.5741,0.7438,0.4057,-0.6915,0.5977,0.5729,-0.6485,0.5012,0.6812,-0.4887,0.5451,0.4057,-0.6915,0.5977,0.3423,-0.5741,0.7438,0.1488,-0.5864,0.7962,0.0415,-0.718,0.6949,0.1177,-0.8143,0.5684,0.2883,-0.8009,0.5248,0.6037,-0.0397,0.7962,0.4365,-0.0733,0.8967,0.3569,-0.2577,0.8979,0.4497,-0.4078,0.7947,0.6217,-0.366,0.6925,0.6956,-0.1824,0.6949,0.4497,-0.4078,0.7947,0.3569,-0.2577,0.8979,0.166,-0.2753,0.9469,0.0651,-0.4378,0.8967,0.1488,-0.5864,0.7962,0.3423,-0.5741,0.7438,0.4365,-0.0733,0.8967,0.3131,0.0728,0.9469,0.1459,0.0357,0.9887,0.0791,-0.1277,0.9887,0.166,-0.2753,0.9469,0.3569,-0.2577,0.8979,-0.4421,0.0221,-0.8967,-0.2902,0.1384,-0.9469,-0.1348,0.0662,-0.9887,-0.1046,-0.1077,-0.9887,-0.2213,-0.2332,-0.9469,-0.404,-0.1751,-0.8979,-0.6858,-0.2239,-0.6925,-0.7186,-0.0288,-0.6949,-0.5981,0.0909,-0.7962,-0.4421,0.0221,-0.8967,-0.404,-0.1751,-0.8979,-0.5268,-0.3017,-0.7947,-0.8799,-0.2277,-0.417,-0.8976,-0.0535,-0.4375,-0.8219,0.0377,-0.5684,-0.7186,-0.0288,-0.6949,-0.6858,-0.2239,-0.6925,-0.7703,-0.331,-0.5451,-0.2713,-0.5407,-0.7962,-0.4576,-0.4872,-0.7438,-0.5268,-0.3017,-0.7947,-0.404,-0.1751,-0.8979,-0.2213,-0.2332,-0.9469,-0.1576,-0.4136,-0.8967,-0.5447,-0.5882,-0.5977,-0.6988,-0.5103,-0.5012,-0.7703,-0.331,-0.5451,-0.6858,-0.2239,-0.6925,-0.5268,-0.3017,-0.7947,-0.4576,-0.4872,-0.7438,-0.1947,-0.6923,-0.6949,-0.2898,-0.77,-0.5684,-0.4536,-0.7203,-0.5248,-0.5447,-0.5882,-0.5977,-0.4576,-0.4872,-0.7438,-0.2713,-0.5407,-0.7962,-0.4402,-0.503,0.7438,-0.5117,-0.3227,0.7962,-0.67,-0.2613,0.6949,-0.738,-0.3636,0.5684,-0.6726,-0.5217,0.5248,-0.5323,-0.5995,0.5977,-0.1348,-0.4191,0.8979,-0.2105,-0.243,0.9469,-0.3962,-0.1972,0.8967,-0.5117,-0.3227,0.7962,-0.4402,-0.503,0.7438,-0.2488,-0.5537,0.7947,0.166,-0.2753,0.9469,0.0791,-0.1277,0.9887,-0.097,-0.1147,0.9887,-0.2105,-0.243,0.9469,-0.1348,-0.4191,0.8979,0.0651,-0.4378,0.8967,-0.1559,-0.7044,0.6925,-0.2488,-0.5537,0.7947,-0.4402,-0.503,0.7438,-0.5323,-0.5995,0.5977,-0.4397,-0.7453,0.5012,-0.2543,-0.7989,0.5451,0.1488,-0.5864,0.7962,0.0651,-0.4378,0.8967,-0.1348,-0.4191,0.8979,-0.2488,-0.5537,0.7947,-0.1559,-0.7044,0.6925,0.0415,-0.718,0.6949,0.1177,-0.8143,0.5684,0.0415,-0.718,0.6949,-0.1559,-0.7044,0.6925,-0.2543,-0.7989,0.5451,-0.1407,-0.898,0.417,0.0344,-0.8985,0.4375,-0.6746,-0.6909,0.2598,-0.7381,-0.5662,0.3669,-0.844,-0.4355,0.313,-0.9004,-0.4092,0.1481,-0.8424,-0.5387,0.0102,-0.7219,-0.6887,0.0677,-0.615,-0.7856,-0.0677,-0.7219,-0.6887,0.0677,-0.8424,-0.5387,0.0102,-0.8524,-0.4882,-0.1876,-0.7388,-0.5919,-0.3221,-0.6218,-0.7388,-0.2598,-0.4914,-0.7898,-0.3669,-0.6218,-0.7388,-0.2598,-0.7388,-0.5919,-0.3221,-0.6988,-0.5103,-0.5012,-0.5447,-0.5882,-0.5977,-0.4536,-0.7203,-0.5248,-0.8424,-0.5387,0.0102,-0.9004,-0.4092,0.1481,-0.9683,-0.2312,0.0948,-0.9799,-0.1758,-0.0948,-0.9225,-0.3032,-0.2391,-0.8524,-0.4882,-0.1876,-0.7388,-0.5919,-0.3221,-0.8524,-0.4882,-0.1876,-0.9225,-0.3032,-0.2391,-0.8799,-0.2277,-0.417,-0.7703,-0.331,-0.5451,-0.6988,-0.5103,-0.5012,-0.9225,-0.3032,-0.2391,-0.9799,-0.1758,-0.0948,-0.9889,0.0145,-0.1481,-0.9478,0.0612,-0.313,-0.8976,-0.0535,-0.4375,-0.8799,-0.2277,-0.417,-0.4397,-0.7453,0.5012,-0.5323,-0.5995,0.5977,-0.6726,-0.5217,0.5248,-0.7381,-0.5662,0.3669,-0.6746,-0.6909,0.2598,-0.517,-0.793,0.3221,-0.1407,-0.898,0.417,-0.2543,-0.7989,0.5451,-0.4397,-0.7453,0.5012,-0.517,-0.793,0.3221,-0.4026,-0.8959,0.1876,-0.2117,-0.9476,0.2391,0.1534,-0.9373,0.313,0.0344,-0.8985,0.4375,-0.1407,-0.898,0.417,-0.2117,-0.9476,0.2391,-0.0793,-0.9923,0.0948,0.1109,-0.9827,0.1481,-0.4026,-0.8959,0.1876,-0.517,-0.793,0.3221,-0.6746,-0.6909,0.2598,-0.7219,-0.6887,0.0677,-0.615,-0.7856,-0.0677,-0.454,-0.891,-0.0102,-0.0793,-0.9923,0.0948,-0.2117,-0.9476,0.2391,-0.4026,-0.8959,0.1876,-0.454,-0.891,-0.0102,-0.3194,-0.936,-0.1481,-0.1356,-0.9862,-0.0948,-0.3194,-0.936,-0.1481,-0.454,-0.891,-0.0102,-0.615,-0.7856,-0.0677,-0.6218,-0.7388,-0.2598,-0.4914,-0.7898,-0.3669,-0.3511,-0.8825,-0.313,-0.67,-0.2613,0.6949,-0.7181,-0.0693,0.6925,-0.8384,-0.005,0.5451,-0.8975,-0.1436,0.417,-0.8439,-0.3103,0.4375,-0.738,-0.3636,0.5684,-0.7181,-0.0693,0.6925,-0.6035,0.0656,0.7947,-0.6144,0.2632,0.7438,-0.7347,0.321,0.5977,-0.8447,0.1879,0.5012,-0.8384,-0.005,0.5451,-0.6144,0.2632,0.7438,-0.4651,0.3869,0.7962,-0.4556,0.5565,0.6949,-0.5739,0.5896,0.5684,-0.704,0.4785,0.5248,-0.7347,0.321,0.5977,-0.3962,-0.1972,0.8967,-0.4403,-0.0013,0.8979,-0.6035,0.0656,0.7947,-0.7181,-0.0693,0.6925,-0.67,-0.2613,0.6949,-0.5117,-0.3227,0.7962,-0.4403,-0.0013,0.8979,-0.2961,0.1251,0.9469,-0.31,0.3159,0.8967,-0.4651,0.3869,0.7962,-0.6144,0.2632,0.7438,-0.6035,0.0656,0.7947,-0.097,-0.1147,0.9887,-0.139,0.0568,0.9887,-0.2961,0.1251,0.9469,-0.4403,-0.0013,0.8979,-0.3962,-0.1972,0.8967,-0.2105,-0.243,0.9469,-0.844,-0.4355,0.313,-0.8439,-0.3103,0.4375,-0.8975,-0.1436,0.417,-0.9667,-0.0915,0.2391,-0.9683,-0.2312,0.0948,-0.9004,-0.4092,0.1481,-0.9683,-0.2312,0.0948,-0.9667,-0.0915,0.2391,-0.9765,0.1061,0.1876,-0.9876,0.1564,-0.0102,-0.9889,0.0145,-0.1481,-0.9799,-0.1758,-0.0948,-0.9889,0.0145,-0.1481,-0.9876,0.1564,-0.0102,-0.9372,0.3421,-0.0677,-0.8948,0.363,-0.2598,-0.903,0.2233,-0.3669,-0.9478,0.0612,-0.313,-0.8975,-0.1436,0.417,-0.8384,-0.005,0.5451,-0.8447,0.1879,0.5012,-0.914,0.2466,0.3221,-0.9765,0.1061,0.1876,-0.9667,-0.0915,0.2391,-0.9765,0.1061,0.1876,-0.914,0.2466,0.3221,-0.8656,0.4281,0.2598,-0.8781,0.4737,0.0677,-0.9372,0.3421,-0.0677,-0.9876,0.1564,-0.0102,-0.8447,0.1879,0.5012,-0.7347,0.321,0.5977,-0.704,0.4785,0.5248,-0.7665,0.527,0.3669,-0.8656,0.4281,0.2598,-0.914,0.2466,0.3221,0.0605,0.6656,0.7438,0.2243,0.5619,0.7962,0.3885,0.6052,0.6949,0.3834,0.728,0.5684,0.2375,0.8174,0.5248,0.0782,0.7979,0.5977,0.0275,0.3203,0.9469,0.2046,0.3925,0.8967,0.2243,0.5619,0.7962,0.0605,0.6656,0.7438,-0.1241,0.5942,0.7947,-0.1373,0.4183,0.8979,-0.139,0.0568,0.9887,0.0111,0.1498,0.9887,0.0275,0.3203,0.9469,-0.1373,0.4183,0.8979,-0.31,0.3159,0.8967,-0.2961,0.1251,0.9469,-0.1241,0.5942,0.7947,0.0605,0.6656,0.7438,0.0782,0.7979,0.5977,-0.0823,0.8614,0.5012,-0.2639,0.7958,0.5451,-0.2879,0.6615,0.6925,-0.31,0.3159,0.8967,-0.1373,0.4183,0.8979,-0.1241,0.5942,0.7947,-0.2879,0.6615,0.6925,-0.4556,0.5565,0.6949,-0.4651,0.3869,0.7962,-0.4556,0.5565,0.6949,-0.2879,0.6615,0.6925,-0.2639,0.7958,0.5451,-0.414,0.8092,0.417,-0.556,0.7067,0.4375,-0.5739,0.5896,0.5684,0.4268,0.8484,0.313,0.5004,0.7471,0.4375,0.6417,0.6437,0.417,0.7283,0.6422,0.2391,0.6474,0.7562,0.0948,0.4879,0.8602,0.1481,0.6474,0.7562,0.0948,0.7283,0.6422,0.2391,0.8524,0.4882,0.1876,0.891,0.454,-0.0102,0.8085,0.5695,-0.1481,0.6894,0.7181,-0.0948,0.8085,0.5695,-0.1481,0.891,0.454,-0.0102,0.9593,0.2741,-0.0677,0.9373,0.2323,-0.2598,0.8618,0.3501,-0.3669,0.8027,0.5076,-0.313,0.6417,0.6437,0.417,0.6753,0.4969,0.5451,0.7938,0.3445,0.5012,0.8844,0.3377,0.3221,0.8524,0.4882,0.1876,0.7283,0.6422,0.2391,0.8524,0.4882,0.1876,0.8844,0.3377,0.3221,0.9519,0.1624,0.2598,0.9888,0.1329,0.0677,0.9593,0.2741,-0.0677,0.891,0.454,-0.0102,0.7938,0.3445,0.5012,0.783,0.1722,0.5977,0.8508,0.0267,0.5248,0.9299,0.0242,0.3669,0.9519,0.1624,0.2598,0.8844,0.3377,0.3221,0.3885,0.6052,0.6949,0.5402,0.4782,0.6925,0.6753,0.4969,0.5451,0.6417,0.6437,0.417,0.5004,0.7471,0.4375,0.3834,0.728,0.5684,0.5402,0.4782,0.6925,0.5268,0.3017,0.7947,0.6517,0.1482,0.7438,0.783,0.1722,0.5977,0.7938,0.3445,0.5012,0.6753,0.4969,0.5451,0.6517,0.1482,0.7438,0.6037,-0.0397,0.7962,0.6956,-0.1824,0.6949,0.8108,-0.1397,0.5684,0.8508,0.0267,0.5248,0.783,0.1722,0.5977,0.2046,0.3925,0.8967,0.3554,0.2598,0.8979,0.5268,0.3017,0.7947,0.5402,0.4782,0.6925,0.3885,0.6052,0.6949,0.2243,0.5619,0.7962,0.3554,0.2598,0.8979,0.3131,0.0728,0.9469,0.4365,-0.0733,0.8967,0.6037,-0.0397,0.7962,0.6517,0.1482,0.7438,0.5268,0.3017,0.7947,0.1459,0.0357,0.9887,0.3131,0.0728,0.9469,0.3554,0.2598,0.8979,0.2046,0.3925,0.8967,0.0275,0.3203,0.9469,0.0111,0.1498,0.9887,0.5993,-0.7115,-0.3669,0.5105,-0.8197,-0.2598,0.3347,-0.8856,-0.3221,0.2694,-0.8223,-0.5012,0.3911,-0.6998,-0.5977,0.5449,-0.654,-0.5248,0.3347,-0.8856,-0.3221,0.2009,-0.9615,-0.1876,0.0033,-0.971,-0.2391,-0.0554,-0.9072,-0.417,0.0768,-0.8349,-0.5451,0.2694,-0.8223,-0.5012,0.0033,-0.971,-0.2391,-0.1356,-0.9862,-0.0948,-0.3194,-0.936,-0.1481,-0.3511,-0.8825,-0.313,-0.2265,-0.8702,-0.4375,-0.0554,-0.9072,-0.417,0.5571,-0.8276,-0.0677,0.4319,-0.8994,0.0677,0.252,-0.9677,0.0102,0.2009,-0.9615,-0.1876,0.3347,-0.8856,-0.3221,0.5105,-0.8197,-0.2598,0.252,-0.9677,0.0102,0.1109,-0.9827,0.1481,-0.0793,-0.9923,0.0948,-0.1356,-0.9862,-0.0948,0.0033,-0.971,-0.2391,0.2009,-0.9615,-0.1876,0.4486,-0.8551,0.2598,0.3104,-0.8769,0.3669,0.1534,-0.9373,0.313,0.1109,-0.9827,0.1481,0.252,-0.9677,0.0102,0.4319,-0.8994,0.0677,0.9245,-0.2969,-0.2391,0.896,-0.4337,-0.0948,0.7915,-0.593,-0.1481,0.7308,-0.6066,-0.313,0.7576,-0.4843,-0.4375,0.8457,-0.333,-0.417,0.9982,-0.0593,0.0102,0.9689,-0.1982,0.1481,0.9192,-0.3821,0.0948,0.896,-0.4337,-0.0948,0.9245,-0.2969,-0.2391,0.9765,-0.1061,-0.1876,0.9519,0.1624,0.2598,0.9299,0.0242,0.3669,0.9388,-0.1437,0.313,0.9689,-0.1982,0.1481,0.9982,-0.0593,0.0102,0.9888,0.1329,0.0677,0.9456,0.0446,-0.3221,0.9765,-0.1061,-0.1876,0.9245,-0.2969,-0.2391,0.8457,-0.333,-0.417,0.8177,-0.1849,-0.5451,0.8653,0.0021,-0.5012,0.9593,0.2741,-0.0677,0.9888,0.1329,0.0677,0.9982,-0.0593,0.0102,0.9765,-0.1061,-0.1876,0.9456,0.0446,-0.3221,0.9373,0.2323,-0.2598,0.8618,0.3501,-0.3669,0.9373,0.2323,-0.2598,0.9456,0.0446,-0.3221,0.8653,0.0021,-0.5012,0.7865,0.1557,-0.5977,0.7903,0.3162,-0.5248,0.7915,-0.593,-0.1481,0.7071,-0.7071,-0.0102,0.5571,-0.8276,-0.0677,0.5105,-0.8197,-0.2598,0.5993,-0.7115,-0.3669,0.7308,-0.6066,-0.313,0.7277,-0.6598,0.1876,0.5945,-0.7368,0.3221,0.4486,-0.8551,0.2598,0.4319,-0.8994,0.0677,0.5571,-0.8276,-0.0677,0.7071,-0.7071,-0.0102,0.5729,-0.6485,0.5012,0.4057,-0.6915,0.5977,0.2883,-0.8009,0.5248,0.3104,-0.8769,0.3669,0.4486,-0.8551,0.2598,0.5945,-0.7368,0.3221,0.9192,-0.3821,0.0948,0.8358,-0.4942,0.2391,0.7277,-0.6598,0.1876,0.7071,-0.7071,-0.0102,0.7915,-0.593,-0.1481,0.896,-0.4337,-0.0948,0.8105,-0.4113,0.417,0.6812,-0.4887,0.5451,0.5729,-0.6485,0.5012,0.5945,-0.7368,0.3221,0.7277,-0.6598,0.1876,0.8358,-0.4942,0.2391,0.9388,-0.1437,0.313,0.8652,-0.245,0.4375,0.8105,-0.4113,0.417,0.8358,-0.4942,0.2391,0.9192,-0.3821,0.0948,0.9689,-0.1982,0.1481,0.5983,-0.3991,-0.6949,0.6428,-0.5136,-0.5684,0.5449,-0.654,-0.5248,0.3911,-0.6998,-0.5977,0.3219,-0.5857,-0.7438,0.4305,-0.4251,-0.7962,0.3446,-0.2777,-0.8967,0.4305,-0.4251,-0.7962,0.3219,-0.5857,-0.7438,0.1241,-0.5942,-0.7947,0.0417,-0.4383,-0.8979,0.1534,-0.2825,-0.9469,0.0701,-0.1328,-0.9887,0.1534,-0.2825,-0.9469,0.0417,-0.4383,-0.8979,-0.1576,-0.4136,-0.8967,-0.2213,-0.2332,-0.9469,-0.1046,-0.1077,-0.9887,0.3911,-0.6998,-0.5977,0.2694,-0.8223,-0.5012,0.0768,-0.8349,-0.5451,0.0011,-0.7214,-0.6925,0.1241,-0.5942,-0.7947,0.3219,-0.5857,-0.7438,0.1241,-0.5942,-0.7947,0.0011,-0.7214,-0.6925,-0.1947,-0.6923,-0.6949,-0.2713,-0.5407,-0.7962,-0.1576,-0.4136,-0.8967,0.0417,-0.4383,-0.8979,0.0768,-0.8349,-0.5451,-0.0554,-0.9072,-0.417,-0.2265,-0.8702,-0.4375,-0.2898,-0.77,-0.5684,-0.1947,-0.6923,-0.6949,0.0011,-0.7214,-0.6925,0.8177,-0.1849,-0.5451,0.8457,-0.333,-0.417,0.7576,-0.4843,-0.4375,0.6428,-0.5136,-0.5684,0.5983,-0.3991,-0.6949,0.6864,-0.2219,-0.6925,0.7865,0.1557,-0.5977,0.8653,0.0021,-0.5012,0.8177,-0.1849,-0.5451,0.6864,-0.2219,-0.6925,0.6035,-0.0656,-0.7947,0.6565,0.1252,-0.7438,0.6871,0.4526,-0.5684,0.7903,0.3162,-0.5248,0.7865,0.1557,-0.5977,0.6565,0.1252,-0.7438,0.5373,0.278,-0.7962,0.5644,0.4457,-0.6949,0.6035,-0.0656,-0.7947,0.6864,-0.2219,-0.6925,0.5983,-0.3991,-0.6949,0.4305,-0.4251,-0.7962,0.3446,-0.2777,-0.8967,0.4297,-0.0958,-0.8979,0.5373,0.278,-0.7962,0.6565,0.1252,-0.7438,0.6035,-0.0656,-0.7947,0.4297,-0.0958,-0.8979,0.3161,0.0586,-0.9469,0.3706,0.242,-0.8967,0.3161,0.0586,-0.9469,0.4297,-0.0958,-0.8979,0.3446,-0.2777,-0.8967,0.1534,-0.2825,-0.9469,0.0701,-0.1328,-0.9887,0.148,0.0257,-0.9887,-0.47,0.8776,-0.0948,-0.2918,0.9449,-0.1481,-0.2346,0.9203,-0.313,-0.3282,0.8372,-0.4375,-0.4885,0.7665,-0.417,-0.5734,0.7836,-0.2391,-0.6674,0.7299,0.1481,-0.5191,0.8494,0.0948,-0.47,0.8776,-0.0948,-0.5734,0.7836,-0.2391,-0.7277,0.6598,-0.1876,-0.7727,0.6347,0.0102,-0.8656,0.4281,0.2598,-0.7665,0.527,0.3669,-0.675,0.6681,0.313,-0.6674,0.7299,0.1481,-0.7727,0.6347,0.0102,-0.8781,0.4737,0.0677,-0.7277,0.6598,-0.1876,-0.5734,0.7836,-0.2391,-0.4885,0.7665,-0.417,-0.5529,0.6303,-0.5451,-0.7013,0.5069,-0.5012,-0.7913,0.5197,-0.3221,-0.8781,0.4737,0.0677,-0.7727,0.6347,0.0102,-0.7277,0.6598,-0.1876,-0.7913,0.5197,-0.3221,-0.8948,0.363,-0.2598,-0.9372,0.3421,-0.0677,-0.903,0.2233,-0.3669,-0.8948,0.363,-0.2598,-0.7913,0.5197,-0.3221,-0.7013,0.5069,-0.5012,-0.7278,0.3363,-0.5977,-0.8252,0.2088,-0.5248,-0.4885,0.7665,-0.417,-0.3282,0.8372,-0.4375,-0.2181,0.7933,-0.5684,-0.2494,0.6745,-0.6949,-0.4249,0.583,-0.6925,-0.5529,0.6303,-0.5451,-0.7013,0.5069,-0.5012,-0.5529,0.6303,-0.5451,-0.4249,0.583,-0.6925,-0.4497,0.4078,-0.7947,-0.6047,0.2847,-0.7438,-0.7278,0.3363,-0.5977,-0.8219,0.0377,-0.5684,-0.8252,0.2088,-0.5248,-0.7278,0.3363,-0.5977,-0.6047,0.2847,-0.7438,-0.5981,0.0909,-0.7962,-0.7186,-0.0288,-0.6949,-0.4249,0.583,-0.6925,-0.2494,0.6745,-0.6949,-0.0984,0.5969,-0.7962,-0.1156,0.4273,-0.8967,-0.2913,0.3301,-0.8979,-0.4497,0.4078,-0.7947,-0.6047,0.2847,-0.7438,-0.4497,0.4078,-0.7947,-0.2913,0.3301,-0.8979,-0.2902,0.1384,-0.9469,-0.4421,0.0221,-0.8967,-0.5981,0.0909,-0.7962,-0.2913,0.3301,-0.8979,-0.1156,0.4273,-0.8967,0.0419,0.3187,-0.9469,0.0213,0.1487,-0.9887,-0.1348,0.0662,-0.9887,-0.2902,0.1384,-0.9469,-0.2181,0.7933,-0.5684,-0.0565,0.8494,-0.5248,0.0949,0.7961,-0.5977,0.0839,0.6631,-0.7438,-0.0984,0.5969,-0.7962,-0.2494,0.6745,-0.6949,-0.0984,0.5969,-0.7962,0.0839,0.6631,-0.7438,0.2488,0.5537,-0.7947,0.2239,0.3791,-0.8979,0.0419,0.3187,-0.9469,-0.1156,0.4273,-0.8967,0.2239,0.3791,-0.8979,0.3706,0.242,-0.8967,0.3161,0.0586,-0.9469,0.148,0.0257,-0.9887,0.0213,0.1487,-0.9887,0.0419,0.3187,-0.9469,0.0949,0.7961,-0.5977,0.2654,0.8236,-0.5012,0.4286,0.7206,-0.5451,0.4232,0.5843,-0.6925,0.2488,0.5537,-0.7947,0.0839,0.6631,-0.7438,0.4232,0.5843,-0.6925,0.5644,0.4457,-0.6949,0.5373,0.278,-0.7962,0.3706,0.242,-0.8967,0.2239,0.3791,-0.8979,0.2488,0.5537,-0.7947,0.5781,0.7014,-0.417,0.6947,0.5709,-0.4375,0.6871,0.4526,-0.5684,0.5644,0.4457,-0.6949,0.4232,0.5843,-0.6925,0.4286,0.7206,-0.5451,-0.1564,0.9876,-0.0102,0.0357,0.9971,-0.0677,0.0688,0.9632,-0.2598,-0.0667,0.9278,-0.3669,-0.2346,0.9203,-0.313,-0.2918,0.9449,-0.1481,-0.2009,0.9615,0.1876,-0.0479,0.9455,0.3221,0.1397,0.9555,0.2598,0.1792,0.9815,0.0677,0.0357,0.9971,-0.0677,-0.1564,0.9876,-0.0102,-0.0823,0.8614,0.5012,0.0782,0.7979,0.5977,0.2375,0.8174,0.5248,0.2644,0.8919,0.3669,0.1397,0.9555,0.2598,-0.0479,0.9455,0.3221,-0.3857,0.8911,0.2391,-0.2009,0.9615,0.1876,-0.1564,0.9876,-0.0102,-0.2918,0.9449,-0.1481,-0.47,0.8776,-0.0948,-0.5191,0.8494,0.0948,-0.2639,0.7958,0.5451,-0.0823,0.8614,0.5012,-0.0479,0.9455,0.3221,-0.2009,0.9615,0.1876,-0.3857,0.8911,0.2391,-0.414,0.8092,0.417,-0.556,0.7067,0.4375,-0.414,0.8092,0.417,-0.3857,0.8911,0.2391,-0.5191,0.8494,0.0948,-0.6674,0.7299,0.1481,-0.675,0.6681,0.313,-0.0667,0.9278,-0.3669,0.0688,0.9632,-0.2598,0.2498,0.9131,-0.3221,0.2654,0.8236,-0.5012,0.0949,0.7961,-0.5977,-0.0565,0.8494,-0.5248,0.2498,0.9131,-0.3221,0.4026,0.8959,-0.1876,0.5681,0.7875,-0.2391,0.5781,0.7014,-0.417,0.4286,0.7206,-0.5451,0.2654,0.8236,-0.5012,0.5681,0.7875,-0.2391,0.6894,0.7181,-0.0948,0.8085,0.5695,-0.1481,0.8027,0.5076,-0.313,0.6947,0.5709,-0.4375,0.5781,0.7014,-0.417,0.0357,0.9971,-0.0677,0.1792,0.9815,0.0677,0.3649,0.931,0.0102,0.4026,0.8959,-0.1876,0.2498,0.9131,-0.3221,0.0688,0.9632,-0.2598,0.3649,0.931,0.0102,0.4879,0.8602,0.1481,0.6474,0.7562,0.0948,0.6894,0.7181,-0.0948,0.5681,0.7875,-0.2391,0.4026,0.8959,-0.1876,0.1397,0.9555,0.2598,0.2644,0.8919,0.3669,0.4268,0.8484,0.313,0.4879,0.8602,0.1481,0.3649,0.931,0.0102,0.1792,0.9815,0.0677],"M":[19,19,18,21,18,21,25,25,12,11,12,11,22,22,18,20,18,20,13,13,12,29,12,29,20,20,10,13,10,13,4,4,1,22,1,22,29,29,3,4,3,4,5,5,1,0,1,0,7,7,28,8,28,8,8,8,21,5,21,5,9,9,10,14,10,14,17,17,28,16,28,16,14,14,19,17,19,17,15,15,11,9,11,9,16,16,24,15,24,15,2,2,3,27,3,27,27,27,25,23,25,23,23,23,24,26,24,26,6,6,0,2,0,2,26,26,7,6,7,6],"T":[0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0,0,1,0,1,1,0],"PC":[0.1829,-0.8755,0.4472,0.8892,-0.0966,0.4472,0.0,-0.0,1.0,-0.8892,0.0966,-0.4472,0.0,-0.0,-1.0,-0.3666,-0.8158,-0.4472,-0.7762,-0.4445,0.4472,-0.6626,0.6008,0.4472,0.3666,0.8158,0.4472,0.7762,0.4445,-0.4472,0.6626,-0.6008,-0.4472,-0.1829,0.8755,-0.4472],"PV":[0.2883,-0.8009,0.5248,0.1177,-0.8143,0.5684,0.0344,-0.8985,0.4375,0.1534,-0.9373,0.313,0.3104,-0.8769,0.3669,0.8508,0.0267,0.5248,0.8108,-0.1397,0.5684,0.8652,-0.245,0.4375,0.9388,-0.1437,0.313,0.9299,0.0242,0.3669,0.0791,-0.1277,0.9887,0.1459,0.0357,0.9887,0.0111,0.1498,0.9887,-0.139,0.0568,0.9887,-0.097,-0.1147,0.9887,-0.9478,0.0612,-0.313,-0.903,0.2233,-0.3669,-0.8252,0.2088,-0.5248,-0.8219,0.0377,-0.5684,-0.8976,-0.0535,-0.4375,0.0213,0.1487,-0.9887,0.148,0.0257,-0.9887,0.0701,-0.1328,-0.9887,-0.1046,-0.1077,-0.9887,-0.1348,0.0662,-0.9887,-0.2265,-0.8702,-0.4375,-0.3511,-0.8825,-0.313,-0.4914,-0.7898,-0.3669,-0.4536,-0.7203,-0.5248,-0.2898,-0.77,-0.5684,-0.6726,-0.5217,0.5248,-0.738,-0.3636,0.5684,-0.8439,-0.3103,0.4375,-0.844,-0.4355,0.313,-0.7381,-0.5662,0.3669,-0.704,0.4785,0.5248,-0.5739,0.5896,0.5684,-0.556,0.7067,0.4375,-0.675,0.6681,0.313,-0.7665,0.527,0.3669,0.2375,0.8174,0.5248,0.3834,0.728,0.5684,0.5004,0.7471,0.4375,0.4268,0.8484,0.313,0.2644,0.8919,0.3669,0.6947,0.5709,-0.4375,0.8027,0.5076,-0.313,0.8618,0.3501,-0.3669,0.7903,0.3162,-0.5248,0.6871,0.4526,-0.5684,0.7576,-0.4843,-0.4375,0.7308,-0.6066,-0.313,0.5993,-0.7115,-0.3669,0.5449,-0.654,-0.5248,0.6428,-0.5136,-0.5684,-0.2346,0.9203,-0.313,-0.0667,0.9278,-0.3669,-0.0565,0.8494,-0.5248,-0.2181,0.7933,-0.5684,-0.3282,0.8372,-0.4375],"MID":[-0.174,0.8327,0.5257,-0.3895,0.3531,0.8507,-0.497,0.8678,-0.0,-0.9121,0.4099,0.0,-0.8457,0.0919,0.5257,0.2155,0.4795,0.8507,0.108,0.9942,-0.0,0.6717,0.7408,0.0,0.7382,0.4228,0.5257,0.174,-0.8327,-0.5257,-0.108,-0.9942,0.0,-0.2155,-0.4795,-0.8507,-0.7382,-0.4228,-0.5257,-0.6717,-0.7408,0.0,0.497,-0.8678,0.0,0.3895,-0.3531,-0.8507,0.8457,-0.0919,-0.5257,0.9121,-0.4099,0.0,0.1075,-0.5146,0.8507,0.6302,-0.5714,0.5257,-0.3487,-0.7759,0.5257,0.5227,-0.0568,0.8507,-0.4562,-0.2613,0.8507,-0.1075,0.5146,-0.8507,0.4562,0.2613,-0.8507,-0.5227,0.0568,-0.8507,0.3487,0.7759,-0.5257,-0.6302,0.5714,-0.5257,0.9789,0.2045,0.0,-0.9789,-0.2045,0.0]};
+const RF = 0.185, LEN = 0.090, RCYL = 0.040, GAP = 0.0025, RCORE = 0.005;
+const DEPTHS = [0, 0.008, 0.014, 0.024, 0.038, 0.054, 0.090];
+const CLIGHT = 0.299792458;                       // m/ns
+const ME = 510.999;                               // keV
+const NCRY = 120;
+const v3 = (a, i) => [a[3 * i], a[3 * i + 1], a[3 * i + 2]];
+const vdot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const vcross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const vnorm = a => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; };
+const vadd = (a, b, s = 1) => [a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2]];
+const vscale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+function solve3(n1, n2, n3, b) {                    // rows n1,n2,n3 · x = b
+  const c23 = vcross(n2, n3), det = vdot(n1, c23);
+  const c31 = vcross(n3, n1), c12 = vcross(n1, n2);
+  return vscale(vadd(vadd(vscale(c23, b[0]), vscale(c31, b[1])), vscale(c12, b[2])), 1 / det);
+}
+const MIDS = Array.from({ length: 30 }, (_, m) => v3(GEO.MID, m));
+const CRY = [];
+for (let i = 0; i < NCRY; i++) {
+  const a = vnorm(v3(GEO.C, i));
+  const cs = Array.from({ length: 6 }, (_, j) => v3(GEO.V, 6 * i + j));
+  const sides = cs.map((c, j) => { let n = vnorm(vcross(c, cs[(j + 1) % 6])); if (vdot(n, a) < 0) n = vscale(n, -1); return n; });
+  const e1 = vnorm(vadd(cs[0], a, -vdot(cs[0], a))), e2 = vcross(a, e1);
+  const planes = sides.map(n => [...n, GAP]);
+  planes.push([...a, RF], [...vscale(a, -1), -(RF + LEN)]);
+  const mod = GEO.M[i], m = MIDS[mod];
+  const cr = { i, a, cs, sides, e1, e2, planes, mod, type: GEO.T[i], hemi: m[0] > 0 ? 1 : 0, on: true,
+               ctr: vscale(a, RF + LEN / 2), ring: Math.abs(m[2]) > 0.6 ? Math.sign(m[2]) : 0 };
+  // corner j of the cross-section at depth D is the meet of side planes j-1 and j with a·x = RF + D
+  cr.corner = (D, j) => solve3(sides[(j + 5) % 6], sides[j], a, [GAP, GAP, RF + D]);
+  const cm = Array.from({ length: 6 }, (_, j) => cr.corner(LEN / 2, j));
+  cr.cang = cm.map(p => Math.atan2(vdot(p, e2), vdot(p, e1)));
+  CRY.push(cr);
+}
+function setConfig(nq) {                           // 30 = full; 20 = entry/exit rings (5 quads around each beam pentagon) removed
+  for (const c of CRY) c.on = nq === 30 || c.ring === 0;
+}
+function segmentOf(cr, p) {
+  const d = vdot(p, cr.a) - RF;
+  let k = 0; while (k < 5 && d > DEPTHS[k + 1]) k++;
+  const ang = Math.atan2(vdot(p, cr.e2), vdot(p, cr.e1));
+  let j = 0;
+  for (let s = 0; s < 6; s++) {
+    const a0 = cr.cang[s], a1 = cr.cang[(s + 1) % 6];
+    const span = ((a1 - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI), rel = ((ang - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    if (rel < span) { j = s; break; }
+  }
+  return 6 * j + k;                                 // wedge j (0–5), slice k (0–5)
+}
+// ray (p + t d, t ≥ 0) against a crystal: convex body = 6 side planes ∩ front/back planes ∩ Ø80 mm cylinder
+function rayCrystal(cr, p, d) {
+  const cx = cr.ctr[0] - p[0], cy = cr.ctr[1] - p[1], cz = cr.ctr[2] - p[2];
+  const tc = cx * d[0] + cy * d[1] + cz * d[2], d2 = cx * cx + cy * cy + cz * cz - tc * tc;
+  if (d2 > 0.0064 || tc < -0.08) return null;    // bounding sphere r = 8 cm
+  let t0 = 0, t1 = 1e9;
+  for (const P of cr.planes) {
+    const den = P[0] * d[0] + P[1] * d[1] + P[2] * d[2], num = P[3] - (P[0] * p[0] + P[1] * p[1] + P[2] * p[2]);
+    if (Math.abs(den) < 1e-12) { if (num > 0) return null; continue; }
+    const t = num / den;
+    if (den > 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t;
+    if (t0 >= t1) return null;
+  }
+  const a = cr.a, pa = vdot(p, a), da = vdot(d, a);
+  const pp = [p[0] - pa * a[0], p[1] - pa * a[1], p[2] - pa * a[2]], dp = [d[0] - da * a[0], d[1] - da * a[1], d[2] - da * a[2]];
+  const A = vdot(dp, dp), B = 2 * vdot(pp, dp), C = vdot(pp, pp) - RCYL * RCYL;
+  if (A < 1e-14) { if (C > 0) return null; }
+  else {
+    const disc = B * B - 4 * A * C; if (disc < 0) return null;
+    const s = Math.sqrt(disc), u0 = (-B - s) / (2 * A), u1 = (-B + s) / (2 * A);
+    if (u0 > t0) t0 = u0; if (u1 < t1) t1 = u1;
+    if (t0 >= t1) return null;
+  }
+  return t1 > 1e-9 ? [t0, t1] : null;
+}
+
+/* ---------------- γ interactions in Ge ---------------- */
+const RHO_GE = 5.323, NE_GE = 1.4116e24, RE2PI = 2 * Math.PI * 2.8179403e-13 ** 2;
+function sigKN(E) {
+  const k = E / ME, l = Math.log(1 + 2 * k);
+  return RE2PI * ((1 + k) / (k * k) * (2 * (1 + k) / (1 + 2 * k) - l / k) + l / (2 * k) - (1 + 3 * k) / ((1 + 2 * k) ** 2));
+}
+function muGe(E) {                                 // 1/m: [total, photo, Compton, pair]
+  const c = NE_GE * sigKN(Math.max(E, 1)) * 100;
+  const p = RHO_GE * 0.40 * Math.pow(Math.max(E, 12) / 100, -3.1) * 100;
+  const pp = E > 1022 ? RHO_GE * 0.0016 * Math.pow((E - 1022) / 978, 1.35) * 100 : 0;
+  return [c + p + pp, p, c, pp];
+}
+let rnd = Math.random;
+const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
+const isoDir = () => { const ct = 2 * rnd() - 1, st = Math.sqrt(1 - ct * ct), ph = 2 * Math.PI * rnd(); return [st * Math.cos(ph), st * Math.sin(ph), ct]; };
+function rotateDir(d, ct, phi) {                   // new direction at polar angle acos(ct) from d
+  const st = Math.sqrt(Math.max(0, 1 - ct * ct));
+  const t = Math.abs(d[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+  const u = vnorm(vcross(d, t)), w = vcross(d, u);
+  return vnorm([0, 1, 2].map(k => ct * d[k] + st * (Math.cos(phi) * u[k] + Math.sin(phi) * w[k])));
+}
+function sampleCompton(E) {                        // Klein–Nishina (Butcher–Messel, as in GEANT4): returns [E'/E, cosθ]
+  const k = E / ME, e0 = 1 / (1 + 2 * k), a1 = -Math.log(e0), a2 = (1 - e0 * e0) / 2;
+  for (let n = 0; n < 1000; n++) {
+    let eps, eps2;
+    if (a1 / (a1 + a2) > rnd()) { eps = Math.exp(-a1 * rnd()); eps2 = eps * eps; }
+    else { eps2 = e0 * e0 + (1 - e0 * e0) * rnd(); eps = Math.sqrt(eps2); }
+    const omc = (1 - eps) / (eps * k), s2 = omc * (2 - omc);
+    if (1 - eps * s2 / (1 + eps2) >= rnd()) return [eps, 1 - omc];
+  }
+  return [1, 1];
+}
+// transport one photon (and its pair-annihilation daughters) through the array
+function transport(ph0, out) {
+  const queue = [ph0];
+  while (queue.length) {
+    let { p, d, E, t, g, kind } = queue.pop();
+    let sp = p, st = t, kd = kind;                  // start of the current straight line (for drawing)
+    for (let steps = 0; steps < 64; steps++) {
+      let best = null;
+      for (const cr of CRY) {
+        if (!cr.on) continue;
+        const iv = rayCrystal(cr, p, d);
+        if (iv && (!best || iv[0] < best[1])) best = [cr, iv[0], iv[1]];
+      }
+      if (!best) {                                   // escapes: draw to r = 0.42 m
+        const b = vdot(p, d), c = vdot(p, p) - 0.42 * 0.42, tE = Math.max(0.02, -b + Math.sqrt(Math.max(0, b * b - c)));
+        out.segs.push({ a: sp, b: vadd(p, d, tE), ta: st, tb: t + tE / CLIGHT, g, kind: kd, esc: 1 });
+        break;
+      }
+      const [cr, t0, t1] = best, mu = muGe(E);
+      const s = -Math.log(1 - rnd()) / mu[0];
+      if (t0 + s < t1) {
+        const tt = t0 + s, q = vadd(p, d, tt), tq = t + tt / CLIGHT;
+        out.segs.push({ a: sp, b: q, ta: st, tb: tq, g, kind: kd });
+        const r = rnd() * mu[0];
+        if (r < mu[1] || E < 8) { out.ints.push({ x: q, E, cry: cr.i, g, t: tq, proc: 0 }); break; }
+        if (r < mu[1] + mu[2]) {
+          const [eps, ct] = sampleCompton(E);
+          out.ints.push({ x: q, E: E * (1 - eps), cry: cr.i, g, t: tq, proc: 1 });
+          E *= eps; d = rotateDir(d, ct, 2 * Math.PI * rnd());
+          p = q; t = tq; sp = q; st = tq; kd = 1;
+          continue;
+        }
+        out.ints.push({ x: q, E: E - 2 * ME, cry: cr.i, g, t: tq, proc: 2 });   // pair: e⁺ annihilates in place
+        const u = isoDir();
+        queue.push({ p: q, d: u, E: ME, t: tq, g, kind: 2 }, { p: q, d: vscale(u, -1), E: ME, t: tq, g, kind: 2 });
+        break;
+      }
+      const tx = t1 + 1e-6; p = vadd(p, d, tx); t += tx / CLIGHT;
+    }
+  }
+}
+
+/* ---------------- sources ---------------- */
+const PRESETS = {
+  mg32: { name: '³²Mg · fast beam', nuc: '³²Mg', beta: 0.40, fast: true, tgt: '⁹Be, 1 mm', rx: 'inelastic excitation on ⁹Be',
+          lines: [885, 1438], casc: () => rnd() < 0.62 ? [[885, 3.4]] : [[1438, 1.0], [885, 3.4]] },
+  si42: { name: '⁴²Si · fast beam', nuc: '⁴²Si', beta: 0.40, fast: true, tgt: '⁹Be, 1 mm', rx: '⁴⁴S → ⁴²Si two-proton knockout on ⁹Be',
+          lines: [742, 1431], casc: () => rnd() < 0.7 ? [[742, 5]] : [[1431, 1.5], [742, 5]] },
+  ca54: { name: '⁵⁴Ca · fast beam', nuc: '⁵⁴Ca', beta: 0.42, fast: true, tgt: '⁹Be, 1 mm', rx: '⁵⁵Sc → ⁵⁴Ca one-proton knockout on ⁹Be',
+          lines: [2043], casc: () => [[2043, 0.3]] },
+  band: { name: 'Rotational band · ReA fusion–evaporation', nuc: 'band', beta: 0.03, fast: false, tgt: 'thin target', rx: 'fusion–evaporation (generic deformed nucleus)',
+          lines: [], casc: () => {
+            const L = [], Imax = 2 * (8 + Math.floor(rnd() * 8));
+            for (let k = 0; k < 2 + Math.floor(rnd() * 3); k++) L.push([700 - 300 * Math.log(rnd() + 1e-9), 0.05]);   // statistical γ
+            for (let I = Imax; I >= 2; I -= 2) L.push([11 * (4 * I - 2), 0.5]);
+            return L;
+          } },
+  co60: { name: '⁶⁰Co source', nuc: '⁶⁰Co', beta: 0, fast: false, src: true, rx: 'β⁻ decay at rest', lines: [1173, 1332], casc: () => [[1173.2, 0], [1332.5, 0]] },
+  mono: { name: 'Mono-energetic γ', nuc: 'γ', beta: 0, fast: false, src: true, rx: 'point source at rest', lines: [1000], casc: () => [[MONO, 0]] },
+};
+let MONO = 1000;
+function bandLines() { const L = []; for (let I = 2; I <= 30; I += 2) L.push(11 * (4 * I - 2)); return L; }
+PRESETS.band.lines = bandLines();
+
+/* ---------------- event generation ---------------- */
+function genEvent(rx, betaNom, bkg) {
+  const P = PRESETS[rx];
+  const out = { rx, P, betaNom, gam: [], segs: [], ints: [] };
+  const zr = P.src ? 0 : 0.001 * (rnd() - 0.5);                         // reaction point in the 1 mm target
+  const bEm = P.src || betaNom === 0 ? 0 : Math.max(0, betaNom + (P.fast ? 0.04 : 0.004) * (rnd() - 0.5));   // slowing in target
+  out.zr = zr; out.bEm = bEm;
+  let tEm = 0;
+  const list = P.casc();
+  list.forEach(([E0, tau], k) => {
+    tEm += tau > 0 ? -tau * 1e-3 * Math.log(rnd() + 1e-12) : 0;      // ps → ns, sequential cascade
+    const z = zr + bEm * CLIGHT * tEm, g = 1 / Math.sqrt(1 - bEm * bEm);
+    const u = isoDir();                                                  // rest-frame direction, boosted along +z
+    const ct = (u[2] + bEm) / (1 + bEm * u[2]), st = Math.sqrt(Math.max(0, 1 - ct * ct)), ph = Math.atan2(u[1], u[0]);
+    const Elab = E0 * g * (1 + bEm * u[2]);
+    out.gam.push({ E0, Elab, d: [st * Math.cos(ph), st * Math.sin(ph), ct], p: [0, 0, z], t: tEm, tr: k, src: 'cas' });
+  });
+  if (bkg && P.fast) {                                                   // atomic bremsstrahlung from the target, at rest
+    let n = 0; const L = Math.exp(-1.2); let pr = rnd(); while (pr > L) { n++; pr *= rnd(); }
+    for (let k = 0; k < n; k++) { const E = 40 + 140 * -Math.log(rnd() + 1e-9); out.gam.push({ E0: E, Elab: E, d: isoDir(), p: [0, 0, zr], t: 0, tr: -1, src: 'bkg' }); }
+  }
+  out.gam.forEach((G, g) => transport({ p: G.p, d: G.d, E: G.Elab, t: G.t, g, kind: 0 }, out));
+  return out;
+}
+
+/* ---------------- detector response: segment merging, smearing ---------------- */
+const SIG_POS = 0.002;
+const fwhm = E => Math.sqrt(1.16 + 0.0027 * E);
+function respond(ev) {
+  const segMap = new Map();
+  for (const I of ev.ints) {
+    if (I.E <= 0) continue;
+    const cr = CRY[I.cry], seg = segmentOf(cr, I.x), key = I.cry * 36 + seg;
+    let S = segMap.get(key);
+    if (!S) { S = { cry: I.cry, seg, E: 0, x: [0, 0, 0], t: 1e9, gE: new Map() }; segMap.set(key, S); }
+    S.E += I.E; S.x = vadd(S.x, I.x, I.E); S.t = Math.min(S.t, I.t);
+    S.gE.set(I.g, (S.gE.get(I.g) || 0) + I.E);
+  }
+  const crys = new Map();
+  for (const S of segMap.values()) {
+    S.xt = vscale(S.x, 1 / S.E);
+    S.g = [...S.gE.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    let C = crys.get(S.cry); if (!C) { C = { cry: S.cry, E: 0, segs: [], t: 1e9 }; crys.set(S.cry, C); }
+    C.E += S.E; C.segs.push(S); C.t = Math.min(C.t, S.t);
+  }
+  const pts = [];
+  for (const C of crys.values()) {
+    C.Em = Math.max(0, C.E + gauss() * fwhm(C.E) / 2.355);
+    const k = C.E > 0 ? C.Em / C.E : 1;
+    for (const S of C.segs) {
+      S.Em = S.E * k;
+      if (S.Em < 5) continue;
+      S.xm = [S.xt[0] + SIG_POS * gauss(), S.xt[1] + SIG_POS * gauss(), S.xt[2] + SIG_POS * gauss()];
+      pts.push(S);
+    }
+  }
+  ev.segMap = segMap; ev.crys = crys; ev.pts = pts;
+  // truth per γ
+  for (const G of ev.gam) { G.dep = 0; G.first = null; }
+  for (const I of ev.ints) { const G = ev.gam[I.g]; G.dep += I.E; if (!G.first || I.t < G.first.t) G.first = I; }
+  for (const G of ev.gam) G.full = G.first && Math.abs(G.dep - G.Elab) < 0.5;
+}
+
+/* ---------------- tracking: cone clustering + Compton figure of merit ---------------- */
+const CONE = 20 * Math.PI / 180, TRK = { sig: 0.006, chi: 5, single: 1500 };   // effective position error for the FOM (merging + resolution)
+function permutations(n) { const r = []; const a = [...Array(n).keys()]; const go = k => { if (k === n) { r.push(a.slice()); return; } for (let i = k; i < n; i++) { [a[k], a[i]] = [a[i], a[k]]; go(k + 1); [a[k], a[i]] = [a[i], a[k]]; } }; go(0); return r; }
+const PERMS = Array.from({ length: 8 }, (_, n) => n < 2 ? [[0]] : permutations(n));
+function fom(P, ord, Etot) {
+  let chi = 0, Eg = Etot, prev = [0, 0, 0];
+  for (let i = 0; i < ord.length - 1; i++) {
+    const a = P[ord[i]].xm, b = P[ord[i + 1]].xm;
+    const u = vnorm(vadd(a, prev, -1)), w = vnorm(vadd(b, a, -1)), ct = vdot(u, w);
+    const Ep = Eg - P[ord[i]].Em;
+    const Egeo = Eg / (1 + Eg / ME * (1 - ct));
+    const lu = Math.hypot(...vadd(a, prev, -1)), lw = Math.hypot(...vadd(b, a, -1));
+    const sth = TRK.sig * Math.sqrt(1 / (lu * lu) + 1 / (lw * lw)) * 1.4;            // angular error (rad)
+    const dEdth = Egeo * Egeo / ME * Math.sqrt(Math.max(1e-6, 1 - ct * ct));
+    const sig = Math.hypot(dEdth * sth, 2.5, 0.01 * Ep);
+    chi += ((Egeo - Ep) / sig) ** 2;
+    Eg = Ep; prev = a;
+  }
+  return chi / Math.max(1, ord.length - 1);
+}
+function trackEvent(ev) {
+  const P = ev.pts, n = P.length, lab = new Int32Array(n).fill(-1);
+  const dirs = P.map(s => vnorm(s.xm)), cc = Math.cos(CONE);
+  let nc = 0;
+  for (let i = 0; i < n; i++) {
+    if (lab[i] >= 0) continue;
+    lab[i] = nc; const st = [i];
+    while (st.length) { const k = st.pop(); for (let j = 0; j < n; j++) if (lab[j] < 0 && vdot(dirs[k], dirs[j]) > cc) { lab[j] = nc; st.push(j); } }
+    nc++;
+  }
+  const clusters = Array.from({ length: nc }, () => ({ pts: [] }));
+  P.forEach((s, i) => clusters[lab[i]].pts.push(s));
+  const b = ev.betaNom, gm = 1 / Math.sqrt(1 - b * b);
+  for (const C of clusters) {
+    const Q = C.pts; C.E = Q.reduce((a, s) => a + s.Em, 0);
+    // dominant truth γ
+    const gE = new Map(); for (const s of Q) for (const [g, e] of s.gE) gE.set(g, (gE.get(g) || 0) + e);
+    C.g = [...gE.entries()].sort((a, c) => c[1] - a[1])[0][0];
+    if (Q.length === 1) { C.ok = C.E < TRK.single; C.first = Q[0]; C.chi = 0; }
+    else {
+      const m = Math.min(Q.length, 7);
+      let sub = Q;
+      if (Q.length > 7) sub = Q.slice().sort((a, c) => Math.hypot(...a.xm) - Math.hypot(...c.xm)).slice(0, 7);
+      let best = 1e9, bo = null;
+      for (const ord of PERMS[m]) { const f = fom(sub, ord, C.E); if (f < best) { best = f; bo = ord; } }
+      C.chi = best; C.first = sub[bo[0]]; C.ok = best < TRK.chi;
+    }
+    const ct = vdot(vnorm(C.first.xm), [0, 0, 1]);
+    C.Edc = C.E * gm * (1 - b * ct);
+    const G = ev.gam[C.g];
+    C.correct = !!(G.first && C.first.cry === G.first.cry && C.first.seg === segmentOf(CRY[G.first.cry], G.first.x));
+  }
+  ev.clusters = clusters;
+  for (const G of ev.gam) { G.cl = null; }
+  for (const C of clusters) { const G = ev.gam[C.g]; if (!G.cl || C.E > G.cl.E) G.cl = C; }
+  // non-tracking reference: one energy per crystal, Doppler-corrected with the crystal centre
+  ev.cryE = [...ev.crys.values()].map(c => { const ct = CRY[c.cry].a[2]; return { E: c.Em, Edc: c.Em * gm * (1 - b * ct), cry: c.cry }; });
+}
+/*PHYS-END*/
+
+/* ================= spectra ================= */
+const NB = 1250, BW = 4;                                      // 0–5000 keV, 4 keV bins
+const H = { trk: new Float32Array(NB), cry: new Float32Array(NB), lab: new Float32Array(NB), n: 0, emitted: new Map(), pk: new Map() };
+let hShow = { trk: true, cry: true, lab: false }, hLog = true;
+function hfill(h, E) { const i = Math.floor(E / BW); if (i >= 0 && i < NB) h[i]++; }
+function clearSpec() {
+  winRel = PRESETS[rxKey].src || betaSel < 0.05 ? 0.012 : 0.04; H.trk.fill(0); H.cry.fill(0); H.lab.fill(0); H.n = 0; H.emitted.clear(); H.pk.clear(); }
+let winRel = 0.012;                                           // relative peak window: 1.2% at rest, 4% in flight
+function peakWin(E0) { return Math.max(6, winRel * E0); }
+function accumulate(ev) {
+  H.n++;
+  for (const C of ev.clusters) if (C.ok) hfill(H.trk, C.Edc);
+  for (const c of ev.cryE) { hfill(H.cry, c.Edc); hfill(H.lab, c.E); }
+  for (const G of ev.gam) if (G.src === 'cas') {
+    const key = Math.round(G.E0);
+    if (!PRESETS[ev.rx].lines.some(l => Math.abs(l - G.E0) < 1)) continue;
+    H.emitted.set(key, (H.emitted.get(key) || 0) + 1);
+  }
+  for (const L of PRESETS[ev.rx].lines) {
+    const w = peakWin(L);
+    let rec = H.pk.get(L); if (!rec) { rec = { trk: [], cry: [] }; H.pk.set(L, rec); }
+    for (const C of ev.clusters) if (C.ok && Math.abs(C.Edc - L) < 3 * w) rec.trk.push(C.Edc);
+    for (const c of ev.cryE) if (Math.abs(c.Edc - L) < 3 * w) rec.cry.push(c.Edc);
+  }
+}
+// net counts in ±w over a linear background from the side bands [w, 3w]; FWHM from the net peak's MAD
+function peakStats(vals, L) {
+  const w = peakWin(L);
+  const inP = vals.filter(v => Math.abs(v - L) < w), side = vals.filter(v => Math.abs(v - L) >= w && Math.abs(v - L) < 3 * w);
+  const net = Math.max(0, inP.length - side.length * (2 * w) / (4 * w));
+  const s = inP.slice().sort((a, b) => a - b), med = s.length ? s[s.length >> 1] : L;
+  const mad = s.length ? s.map(v => Math.abs(v - med)).sort((a, b) => a - b)[s.length >> 1] : 0;
+  return { net, fwhm: 2.355 * 1.4826 * mad };
+}
+
+/* ---------------- renderer ---------------- */
+let renderer;
+try {
+  renderer = new THREE.WebGPURenderer({ antialias: true, preserveDrawingBuffer: true });
+  await renderer.init();
+} catch (e) { fail('Could not start a WebGPU or WebGL2 renderer in this browser.'); throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x060a13, 1);
+renderer.domElement.classList.add('gl');
+app.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x060a13, 3, 7);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.002, 40);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.03; controls.maxDistance = 6;
+controls.autoRotateSpeed = 0.5; controls.autoRotate = true;
+scene.add(new THREE.HemisphereLight(0xbfd2ff, 0x1a1408, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, 4); scene.add(sun);
+
+/* ---------------- uniforms ---------------- */
+const uT = uniform(-10);        // physics time since the reaction (ns)
+const uDet = uniform(1);
+const uLight = uniform(0);
+const uCut = uniform(0);
+const uSegs = uniform(1);
+const themed = [];
+const det = new THREE.Group(); scene.add(det);
+
+function shellMat(hex, rim, base) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const f = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(3);
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = f.mul(rim).add(base).mul(uDet).mul(mix(float(1), float(1.6), uLight));
+  themed.push(m); return m;
+}
+function faceMat(hex, op) {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  m.colorNode = color(hex).mul(mix(float(1), float(0.6), uLight));
+  m.opacityNode = float(op).mul(uDet).mul(mix(float(1), float(1.8), uLight));
+  themed.push(m); return m;
+}
+const lineMats = [];
+const lineMat = (hex, op) => {
+  const m = new THREE.LineBasicNodeMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false });
+  m.userData.base = { color: new THREE.Color(hex), opacity: op };
+  lineMats.push(m); return m;
+};
+function segs(v, mat, parent = det) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  const l = new THREE.LineSegments(g, mat); parent.add(l); return l;
+}
+function ringV(v, r, z, n) {
+  for (let i = 0; i < n; i++) { const p0 = i / n * 2 * Math.PI, p1 = (i + 1) / n * 2 * Math.PI; v.push(r * Math.cos(p0), r * Math.sin(p0), z, r * Math.cos(p1), r * Math.sin(p1), z); }
+  return v;
+}
+function cyl(r, z0, z1, mat, sides = 48, parent = det) {
+  const g = new THREE.CylinderGeometry(r, r, z1 - z0, sides, 1, true);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, (z0 + z1) / 2);
+  const m = new THREE.Mesh(g, mat); parent.add(m); return m;
+}
+
+/* ---------------- crystals: tapered irregular hexagons, clipped to the Ø80 mm cylinder ---------------- */
+const NPS = 6;                                                    // samples per hexagon side
+const RINGS = [0, 0.004, 0.008, 0.014, 0.024, 0.031, 0.038, 0.054, 0.072, 0.090];
+function section(cr, D) {                                         // closed outline at depth D (3D points, 6·NPS)
+  const C = Array.from({ length: 6 }, (_, j) => cr.corner(D, j)), c0 = vscale(cr.a, RF + D), pts = [];
+  for (let j = 0; j < 6; j++) for (let s = 0; s < NPS; s++) {
+    const p = vadd(C[j], vadd(C[(j + 1) % 6], C[j], -1), s / NPS);
+    let w = vadd(p, c0, -1); const r = Math.hypot(...w);
+    if (r > RCYL) w = vscale(w, RCYL / r);
+    pts.push(vadd(c0, w));
+  }
+  return pts;
+}
+const SHELL_COLS = {
+  type: c => c.type ? '#9fc0ea' : '#5f86c4',
+  module: c => '#' + new THREE.Color().setHSL((c.mod * 0.381966) % 1, 0.55, 0.62).getHexString(),
+  hemi: c => c.hemi ? '#7fb6d9' : '#c79bff',
+};
+const cryGeos = [], cryVtx = [];                                   // vertex range per crystal in the merged mesh
+let vOff = 0;
+const edgeHi = [], edgeLo = [], edgeHemiHi = [], edgeHemiLo = [], edgeOnHi = [], edgeOnLo = [];
+for (const cr of CRY) {
+  const rings = RINGS.map(D => section(cr, D)), N = 6 * NPS;
+  const pos = [], idx = [];
+  for (const R of rings) for (const p of R) pos.push(...p);
+  for (let r = 0; r < rings.length - 1; r++) for (let k = 0; k < N; k++) {
+    const a = r * N + k, b = r * N + (k + 1) % N, c = (r + 1) * N + k, d = (r + 1) * N + (k + 1) % N;
+    idx.push(a, c, b, b, c, d);
+  }
+  for (const [ri, D] of [[0, 0], [rings.length - 1, LEN]]) {        // caps
+    const ci = pos.length / 3; pos.push(...vscale(cr.a, RF + D));
+    for (let k = 0; k < N; k++) idx.push(ci, ri * N + k, ri * N + (k + 1) % N);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  const nv = pos.length / 3;
+  g.setAttribute('hemi', new THREE.Float32BufferAttribute(new Float32Array(nv).fill(cr.hemi), 1));
+  cryGeos.push(g); cryVtx.push([vOff, nv]); vOff += nv;
+  // outlines: front/back + corner lines (bright), segment slices (faint)
+  const push = (arr, harr, oarr, p, q) => { arr.push(...p, ...q); harr.push(cr.hemi, cr.hemi); oarr.push(cr.i, cr.i); };
+  for (const ri of [0, rings.length - 1]) for (let k = 0; k < N; k++) push(edgeHi, edgeHemiHi, edgeOnHi, rings[ri][k], rings[ri][(k + 1) % N]);
+  for (let j = 0; j < 6; j++) for (let r = 0; r < rings.length - 1; r++) push(edgeHi, edgeHemiHi, edgeOnHi, rings[r][j * NPS], rings[r + 1][j * NPS]);
+  for (const D of DEPTHS.slice(1, -1)) { const s = section(cr, D); for (let k = 0; k < N; k++) push(edgeLo, edgeHemiLo, edgeOnLo, s[k], s[(k + 1) % N]); }
+}
+const cryGeo = mergeGeometries(cryGeos);
+const NCV = cryGeo.attributes.position.count;
+const cryBase = new THREE.BufferAttribute(new Float32Array(NCV * 3), 3);
+const cryOn = new THREE.BufferAttribute(new Float32Array(NCV).fill(1), 1);
+const cryHc = new THREE.BufferAttribute(new Float32Array(NCV * 3), 3).setUsage(THREE.DynamicDrawUsage);
+const cryHt = new THREE.BufferAttribute(new Float32Array(NCV).fill(1e9), 1).setUsage(THREE.DynamicDrawUsage);
+cryGeo.setAttribute('baseCol', cryBase); cryGeo.setAttribute('on', cryOn); cryGeo.setAttribute('hcol', cryHc); cryGeo.setAttribute('ht', cryHt);
+const cryMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+{
+  const fres = float(1).sub(abs(dot(normalView, positionViewDirection))).pow(2.5);
+  const ht = attribute('ht', 'float'), on = attribute('on', 'float'), hemi = attribute('hemi', 'float');
+  const hit = step(ht, uT);
+  const glow = exp(uT.sub(ht).max(0).mul(-2.5)).mul(1.4).add(0.45).mul(hit);
+  const cut = float(1).sub(uCut.mul(hemi).mul(0.93));
+  cryMat.colorNode = mix(attribute('baseCol', 'vec3').mul(mix(float(1), float(0.55), uLight)), attribute('hcol', 'vec3').mul(mix(glow, float(0.85), uLight)), hit);
+  cryMat.opacityNode = fres.mul(0.13).add(0.007).mul(uDet).mul(cut).mul(mix(float(1), float(1.7), uLight)).add(hit.mul(0.09)).mul(on);
+  themed.push(cryMat);
+}
+det.add(new THREE.Mesh(cryGeo, cryMat));
+const edgeOnA = [], edgeMats = [];
+function edgeLines(v, hemi, ids, hex, op) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  g.setAttribute('hemi', new THREE.Float32BufferAttribute(hemi, 1));
+  const on = new THREE.BufferAttribute(new Float32Array(hemi.length).fill(1), 1); g.setAttribute('on', on);
+  edgeOnA.push([on, ids]);
+  const m = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  m.colorNode = color(hex).mul(mix(float(1), float(0.5), uLight));
+  m.opacityNode = float(op).mul(mix(float(1), float(1.8), uLight)).mul(uDet).mul(float(1).sub(uCut.mul(attribute('hemi', 'float')).mul(0.92))).mul(attribute('on', 'float'));
+  themed.push(m); edgeMats.push(m);
+  det.add(new THREE.LineSegments(g, m));
+}
+edgeLines(edgeHi, edgeHemiHi, edgeOnHi, '#8fb0d8', 0.22);
+edgeLines(edgeLo, edgeHemiLo, edgeOnLo, '#8fb0d8', 0.06);
+function applyShellColours(mode) {
+  const c = new THREE.Color();
+  CRY.forEach((cr, i) => { c.set(SHELL_COLS[mode](cr)); const [o, n] = cryVtx[i]; for (let k = o; k < o + n; k++) cryBase.setXYZ(k, c.r, c.g, c.b); });
+  cryBase.needsUpdate = true;
+}
+function applyConfig() {
+  CRY.forEach((cr, i) => { const [o, n] = cryVtx[i]; for (let k = o; k < o + n; k++) cryOn.array[k] = cr.on ? 1 : 0; });
+  cryOn.needsUpdate = true;
+  for (const [on, ids] of edgeOnA) { for (let k = 0; k < ids.length; k++) on.array[k] = CRY[ids[k]].on ? 1 : 0; on.needsUpdate = true; }
+}
+applyShellColours('type');
+
+// pentagon holes at the front-face radius
+{
+  const v = [];
+  for (let p = 0; p < 12; p++) for (let j = 0; j < 5; j++) {
+    const a = vscale(v3(GEO.PV, 5 * p + j), RF), b = vscale(v3(GEO.PV, 5 * p + (j + 1) % 5), RF);
+    v.push(...a, ...b);
+  }
+  segs(v, lineMat(0xffb24a, 0.16));
+}
+// beam pipe (Ø 5 cm) through the ±z pentagons, target foil and holder
+const PIPE_R = 0.025;
+cyl(PIPE_R, -1.6, 1.6, shellMat('#8796b1', 0.22, 0.006));
+{
+  const v = []; for (const z of [-1.6, -RF, RF, 1.6]) ringV(v, PIPE_R, z, 32);
+  segs(v, lineMat(0x8796b1, 0.35));
+  segs([0, 0, -2.4, 0, 0, 2.4], lineMat(0x8796b1, 0.22), scene);
+}
+const tgtMesh = new THREE.Mesh(new THREE.CircleGeometry(0.015, 40), faceMat('#ffd166', 0.14));
+det.add(tgtMesh);
+segs(ringV([], 0.015, 0, 40), lineMat(0xffd166, 0.5));
+// downstream S800 entrance (quadrupole triplet, schematic)
+const s800 = new THREE.Group(); det.add(s800);
+{
+  const qm = lineMat(0xc44a3a, 0.32), qf = shellMat('#c44a3a', 0.28, 0.01);
+  for (const [z0, z1] of [[0.62, 0.92], [1.0, 1.42], [1.5, 1.8]]) {
+    cyl(0.11, z0, z1, qf, 48, s800);
+    const v = []; ringV(v, 0.11, z0, 48); ringV(v, 0.11, z1, 48); ringV(v, PIPE_R + 0.01, z0, 24); ringV(v, PIPE_R + 0.01, z1, 24); segs(v, qm, s800);
+  }
+}
+
+/* ---------------- dynamic objects: ion, photon lines, interaction points, fired segments ---------------- */
+const ionMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+ionMat.colorNode = mix(color('#ffd9a0').mul(1.3), color('#b86400'), uLight); themed.push(ionMat);
+const ion = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), ionMat); scene.add(ion);
+const trailPos = new Float32Array(12);
+const trailGeo = new THREE.BufferGeometry(); trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3).setUsage(THREE.DynamicDrawUsage));
+const trailMat = lineMat(0xffb24a, 0.75);
+const trail = new THREE.LineSegments(trailGeo, trailMat); trail.frustumCulled = false; scene.add(trail);
+const srcMark = new THREE.Mesh(new THREE.SphereGeometry(0.004, 16, 10), ionMat); scene.add(srcMark);
+
+const MAXL = 6000;
+const lBuf = { position: new Float32Array(MAXL * 6), tns: new Float32Array(MAXL * 2), pd: new Float32Array(MAXL * 2), kind: new Float32Array(MAXL * 2), pcol: new Float32Array(MAXL * 6) };
+const lGeo = new THREE.BufferGeometry(), lAttr = {};
+for (const [k, a] of Object.entries(lBuf)) { lAttr[k] = new THREE.BufferAttribute(a, a.length === MAXL * 6 ? 3 : 1).setUsage(THREE.DynamicDrawUsage); lGeo.setAttribute(k, lAttr[k]); }
+lGeo.setDrawRange(0, 0);
+const lMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const tn = attribute('tns', 'float'), kind = attribute('kind', 'float');
+  const dash = step(fract(attribute('pd', 'float').mul(90)), float(0.55));
+  const head = exp(uT.sub(tn).max(0).mul(-4)).mul(2.2).add(1);
+  lMat.colorNode = attribute('pcol', 'vec3').mul(mix(head, float(0.8), uLight));
+  lMat.opacityNode = step(tn, uT).mul(mix(dash, float(1), step(0.5, kind))).mul(0.9);
+  themed.push(lMat);
+}
+const glines = new THREE.LineSegments(lGeo, lMat); glines.frustumCulled = false; scene.add(glines);
+
+const MAXH = 1000;                       // ≤ 1024: WebGPU keeps small instance counts in a uniform buffer (64 KiB cap)
+const hitGeo = new THREE.OctahedronGeometry(1, 0);
+const hT = new THREE.InstancedBufferAttribute(new Float32Array(MAXH), 1).setUsage(THREE.DynamicDrawUsage);
+const hC = new THREE.InstancedBufferAttribute(new Float32Array(MAXH * 3), 3).setUsage(THREE.DynamicDrawUsage);
+hitGeo.setAttribute('hitT', hT); hitGeo.setAttribute('hcol', hC);
+const hitMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const ht = attribute('hitT', 'float');
+  hitMat.colorNode = attribute('hcol', 'vec3').mul(mix(exp(uT.sub(ht).max(0).mul(-3)).mul(2.6).add(0.9), float(0.7), uLight));
+  hitMat.opacityNode = step(ht, uT);
+  themed.push(hitMat);
+}
+const hits = new THREE.InstancedMesh(hitGeo, hitMat, MAXH); hits.count = 0; hits.frustumCulled = false;
+hits.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(hits);
+
+const MAXS = 30000;
+const sBuf = { position: new Float32Array(MAXS * 6), st: new Float32Array(MAXS * 2) };
+const sGeo = new THREE.BufferGeometry(), sAttr = {};
+for (const [k, a] of Object.entries(sBuf)) { sAttr[k] = new THREE.BufferAttribute(a, a.length === MAXS * 6 ? 3 : 1).setUsage(THREE.DynamicDrawUsage); sGeo.setAttribute(k, sAttr[k]); }
+sGeo.setDrawRange(0, 0);
+const sMat = new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+{
+  const st = attribute('st', 'float');
+  sMat.colorNode = mix(color('#ffb24a').mul(exp(uT.sub(st).max(0).mul(-3)).mul(1.6).add(0.9)), color('#b86400'), uLight);
+  sMat.opacityNode = step(st, uT).mul(0.75).mul(uSegs);
+  themed.push(sMat);
+}
+const segLines = new THREE.LineSegments(sGeo, sMat); segLines.frustumCulled = false; scene.add(segLines);
+
+/* ---------------- bloom ---------------- */
+let post = null;
+try {
+  post = new THREE.PostProcessing(renderer);
+  const sp = pass(scene, camera), col = sp.getTextureNode('output');
+  post.outputNode = col.add(bloom(col, 0.55, 0.35, 0.18));
+} catch (e) { post = null; }
+
+/* ================= colours ================= */
+const E_STOPS = [10, 3000];
+const E_COLS = ['#3d2b8f', '#9a3cc0', '#ff5a7a', '#ffb24a', '#fff3c4'].map(h => new THREE.Color(h));
+function energyColor(E, out) {
+  const x = THREE.MathUtils.clamp(Math.log10(E / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]), 0, 1) * 4;
+  const i = Math.min(3, Math.floor(x));
+  return out.copy(E_COLS[i]).lerp(E_COLS[i + 1], x - i);
+}
+const TR_COLS = ['#ffb24a', '#5fe3ff', '#7be38a', '#ff6b8b', '#c79bff', '#ffd166'].map(h => new THREE.Color(h));
+const BKG_COL = new THREE.Color('#8796b1');
+const ST_COLS = { good: new THREE.Color('#7be38a'), mis: new THREE.Color('#ffb24a'), rej: new THREE.Color('#ff5d3a'), miss: new THREE.Color('#56637c') };
+const BAND_LO = new THREE.Color('#5fe3ff'), BAND_HI = new THREE.Color('#ff6b8b');
+const tmpC = new THREE.Color();
+function gammaColor(G, mode, ev) {
+  if (mode === 'energy') return energyColor(G.Elab, tmpC);
+  if (mode === 'track') {
+    if (!G.first) return ST_COLS.miss;
+    if (!G.cl || !G.cl.ok || G.cl.g !== ev.gam.indexOf(G)) return ST_COLS.rej;
+    return G.cl.correct ? ST_COLS.good : ST_COLS.mis;
+  }
+  if (G.src === 'bkg') return BKG_COL;
+  if (ev.rx === 'band') return tmpC.copy(BAND_LO).lerp(BAND_HI, THREE.MathUtils.clamp(G.E0 / 1300, 0, 1));
+  const li = ev.P.lines.findIndex(l => Math.abs(l - G.E0) < 1);
+  return TR_COLS[Math.max(0, li) % TR_COLS.length];
+}
+
+/* ================= event → display ================= */
+let ev = null, evNo = 0;
+let rxKey = 'mg32', betaSel = 0.40, colorMode = 'trans', bkgOn = true, nQuads = 30;
+function buildDisplay() {
+  // photon lines
+  let nl = 0;
+  const B = lBuf;
+  ev.segLine = [];
+  for (const S of ev.segs) {
+    if (nl >= MAXL) break;
+    const L = Math.hypot(...vadd(S.b, S.a, -1));
+    B.position.set([...S.a, ...S.b], nl * 6);
+    B.tns[2 * nl] = S.ta; B.tns[2 * nl + 1] = S.tb;
+    B.pd[2 * nl] = 0; B.pd[2 * nl + 1] = L;
+    B.kind[2 * nl] = B.kind[2 * nl + 1] = S.kind ? 1 : 0;
+    ev.segLine.push([nl, S.g]);
+    nl++;
+  }
+  lGeo.setDrawRange(0, nl * 2);
+  // interaction points (true positions, size ∝ E^(1/3))
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
+  let nh = 0;
+  for (const I of ev.ints) {
+    if (nh >= MAXH || I.E <= 0) continue;
+    p.set(...I.x); s.setScalar(0.0016 + 0.0036 * Math.cbrt(I.E / 1000)); M.compose(p, q, s); hits.setMatrixAt(nh, M);
+    energyColor(I.E, col); hC.array.set([col.r, col.g, col.b], nh * 3); hT.array[nh] = I.t; nh++;
+  }
+  hits.count = nh; hits.instanceMatrix.needsUpdate = true; hT.needsUpdate = true; hC.needsUpdate = true;
+  // crystals that fired: glow coloured by crystal energy
+  cryHt.array.fill(1e9);
+  for (const C of ev.crys.values()) {
+    energyColor(C.Em, col); const [o, n] = cryVtx[C.cry];
+    for (let k = o; k < o + n; k++) { cryHt.array[k] = C.t; cryHc.setXYZ(k, col.r, col.g, col.b); }
+  }
+  cryHt.needsUpdate = true; cryHc.needsUpdate = true;
+  // fired segments: wedge outlines between their slice depths
+  let ns = 0;
+  const pushL = (a, b, t) => { if (ns >= MAXS) return; sBuf.position.set([...a, ...b], ns * 6); sBuf.st[2 * ns] = sBuf.st[2 * ns + 1] = t; ns++; };
+  for (const S of ev.segMap.values()) {
+    const cr = CRY[S.cry], j = Math.floor(S.seg / 6), k = S.seg % 6;
+    const outl = [DEPTHS[k], DEPTHS[k + 1]].map(D => {
+      const sec = section(cr, D), arc = [];
+      for (let m = 0; m <= NPS; m++) arc.push(sec[(j * NPS + m) % (6 * NPS)]);
+      return { arc, c: vscale(cr.a, RF + D) };
+    });
+    for (const o of outl) {
+      for (let m = 0; m < NPS; m++) pushL(o.arc[m], o.arc[m + 1], S.t);
+      for (const e of [o.arc[0], o.arc[NPS]]) { const dir = vnorm(vadd(e, o.c, -1)); pushL(vadd(o.c, dir, RCORE), e, S.t); }
+    }
+    pushL(outl[0].arc[0], outl[1].arc[0], S.t); pushL(outl[0].arc[NPS], outl[1].arc[NPS], S.t);
+  }
+  sGeo.setDrawRange(0, ns * 2); for (const a of Object.values(sAttr)) a.needsUpdate = true;
+  recolor();
+}
+function recolor() {
+  if (!ev) return;
+  for (const [i, g] of ev.segLine) { const c = gammaColor(ev.gam[g], colorMode, ev); lBuf.pcol.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6); }
+  for (const a of Object.values(lAttr)) a.needsUpdate = true;
+  legend();
+}
+
+function newEvent() {
+  ev = genEvent(rxKey, PRESETS[rxKey].src ? 0 : betaSel, bkgOn);
+  respond(ev); trackEvent(ev); accumulate(ev);
+  evNo++;
+  buildDisplay();
+  ev.tPre = PRESETS[rxKey].src ? 0.25 : 0.35 / (Math.max(ev.bEm, 0.02) * CLIGHT);    // ns of approach shown
+  ev.tEnd = Math.max(1.6, ...ev.segs.map(s => s.tb)) + 0.6;
+  phys = -ev.tPre - 0.15; lastPhase = -1;
+  stats(); drawSpec();
+}
+function replay() { phys = -ev.tPre - 0.15; lastPhase = -1; }
+
+/* ================= HUD ================= */
+const fmtE = e => e.toFixed(e < 100 ? 1 : 0);
+function stats() {
+  const P = ev.P, b = ev.betaNom;
+  $('eyebrow').textContent = `FRIB · GRETA · ${P.name} · toy MC`;
+  $('beamLine').innerHTML = P.src
+    ? `${P.nuc} ${P.rx} · target position · ${nQuads} quads (${CRY.filter(c => c.on).length} crystals)`
+    : `${P.nuc} at β = ${b.toFixed(2)} (γ = ${(1 / Math.sqrt(1 - b * b)).toFixed(3)}) · ${P.rx} · ${P.tgt}`;
+  const det = ev.gam.filter(G => G.first).length, full = ev.gam.filter(G => G.full).length;
+  const acc = ev.clusters.filter(C => C.ok), ok = acc.filter(C => C.correct).length;
+  const segN = ev.segMap.size;
+  $('sEv').textContent = '#' + String(evNo).padStart(3, '0');
+  $('sBeta').textContent = ev.bEm.toFixed(3);
+  $('sMg').textContent = ev.gam.length;
+  $('sMd').textContent = det;
+  $('sFull').textContent = full;
+  $('sInt').textContent = ev.ints.length;
+  $('sCry').textContent = ev.crys.size;
+  $('sSeg').textContent = segN;
+  $('sSum').textContent = [...ev.crys.values()].reduce((a, c) => a + c.Em, 0).toFixed(0);
+  $('sTrk').textContent = `${acc.length} / ${ev.clusters.length}`;
+  $('sOk').textContent = acc.length ? `${ok} / ${acc.length}` : '—';
+  $('sQuads').textContent = nQuads;
+}
+const gammaList = () => ev.gam.filter(G => G.src === 'cas').slice(0, 6).map(G => `${fmtE(G.E0)}→${fmtE(G.Elab)}`).join(', ') + (ev.gam.filter(G => G.src === 'cas').length > 6 ? ', …' : '');
+const PHASES = [
+  [0, () => ev.P.src ? 'Source' : 'Approach', () => ev.P.src ? `${ev.P.nuc} at the target position; ${ev.gam.length} γ in this decay.` : `${ev.P.nuc} recoil-beam ion at β ≈ ${ev.betaNom.toFixed(2)} (${(ev.betaNom * CLIGHT * 100).toFixed(1)} cm/ns) heads for the ${ev.P.tgt} target through the pentagon hole.`],
+  [0.15, () => ev.P.src ? 'Emission' : 'Reaction', () => ev.P.src ? `γ rays emitted isotropically at rest — no Doppler shift.` : `${ev.P.rx}; the excited ${ev.P.nuc} keeps flying at β = ${ev.bEm.toFixed(3)} and decays within ps (βcτ ≲ mm).`],
+  [0.6, 'γ emission', () => ev.P.src ? `E (keV): ${gammaList()}.` : `Doppler-shifted in flight, E₀ → E_lab (keV): ${gammaList()}. Forward γ are blue-shifted, backward red-shifted: E_lab = E₀ / γ(1 − β cos θ).`],
+  [1.8, 'Interactions', () => `${ev.ints.length} interactions in ${ev.crys.size} crystals / ${ev.segMap.size} segments: Compton scatters (solid lines), photoabsorption and pair production. ${ev.gam.filter(G => G.full).length} of ${ev.gam.length} γ fully absorbed. Fired segments outlined amber.`],
+  [1e9, 'Tracking', () => {
+    const acc = ev.clusters.filter(C => C.ok);
+    const e = acc.slice(0, 5).map(C => fmtE(C.Edc)).join(', ');
+    return `${ev.pts.length} points (one per segment, σ = 2 mm) → ${ev.clusters.length} clusters, ${acc.length} accepted by the Compton figure of merit${ev.P.src ? '' : ', Doppler-corrected with the first interaction'}: ${e || '—'} keV. ${acc.filter(C => C.correct).length} with the true first point.`;
+  }],
+];
+let lastPhase = -1;
+function phaseUpdate(t) {
+  const i = PHASES.findIndex(p => t < p[0]);
+  if (i !== lastPhase) {
+    lastPhase = i; const nm = PHASES[i][1];
+    $('phaseName').textContent = typeof nm === 'function' ? nm() : nm; $('phaseNote').textContent = PHASES[i][2]();
+  }
+}
+
+/* ---------------- legend ---------------- */
+function legend() {
+  const el = $('legend'), hx = c => '#' + c.getHexString(THREE.SRGBColorSpace);
+  let h = '';
+  if (colorMode === 'trans') {
+    if (ev.rx === 'band') h = `<h2>γ origin</h2><div class="ramp" style="background:linear-gradient(90deg,${hx(BAND_LO)},${hx(BAND_HI)})"></div>
+      <div class="ticks"><span style="left:0">0</span><span style="left:50%">650</span><span style="left:100%">1300 keV</span></div>
+      <div class="keys"><span class="key muted">band E(I→I−2) = 11·(4I−2) keV + statistical γ</span></div>`;
+    else h = `<h2>γ origin (E₀, keV)</h2><div class="keys">${ev.P.lines.map((l, i) => `<span class="key"><i style="background:${hx(TR_COLS[i % TR_COLS.length])}"></i>${l}</span>`).join('')}${ev.P.fast ? `<span class="key muted"><i style="background:${hx(BKG_COL)}"></i>atomic bkg</span>` : ''}</div>`;
+  } else if (colorMode === 'track') {
+    h = `<h2>Tracking result (vs MC truth)</h2><div class="keys">
+      <span class="key"><i style="background:${hx(ST_COLS.good)}"></i>accepted, 1st point ✓</span>
+      <span class="key"><i style="background:${hx(ST_COLS.mis)}"></i>accepted, wrong order</span>
+      <span class="key"><i style="background:${hx(ST_COLS.rej)}"></i>rejected</span>
+      <span class="key muted"><i style="background:${hx(ST_COLS.miss)}"></i>no interaction</span></div>`;
+  } else h = `<h2>γ lab energy (keV)</h2><div class="keys"><span class="key muted">same scale as interaction points</span></div>`;
+  const lg = v => (Math.log10(v / E_STOPS[0]) / Math.log10(E_STOPS[1] / E_STOPS[0]) * 100).toFixed(1);
+  h += `<h2 class="sub">Energy deposit / crystal energy (keV)</h2>
+    <div class="ramp" style="background:linear-gradient(90deg,${E_COLS.map(hx).join(',')})"></div>
+    <div class="ticks">${[10, 100, 1000, 3000].map(v => `<span style="left:${lg(v)}%">${v}</span>`).join('')}</div>
+    <div class="keys"><span class="key"><i class="dash"></i>γ to 1st interaction</span><span class="key"><i style="background:var(--gamma)"></i>scattered γ</span><span class="key"><i class="seg"></i>fired segment</span></div>`;
+  el.innerHTML = h;
+}
+
+/* ---------------- spectrum panel ---------------- */
+const cv = $('specCv'), g2 = cv.getContext('2d');
+function drawSpec() {
+  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--ink').trim(), muted = css.getPropertyValue('--muted').trim(), amber = css.getPropertyValue('--amber').trim(), steel = css.getPropertyValue('--steel').trim();
+  const W = cv.clientWidth, Hh = cv.clientHeight, dpr = Math.min(devicePixelRatio, 2);
+  if (!W) return;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(Hh * dpr); }
+  g2.setTransform(dpr, 0, 0, dpr, 0, 0); g2.clearRect(0, 0, W, Hh);
+  const P = PRESETS[rxKey], Lmax = Math.max(...P.lines, 400);
+  const xmax = Math.min(NB * BW, Math.max(600, Math.ceil(Lmax * (1 + 1.6 * betaSel * (P.src ? 0 : 1)) * 1.25 / 200) * 200));
+  const nb = Math.floor(xmax / BW), padL = 26, padB = 14, w = W - padL - 4, h = Hh - padB - 6;
+  const reb = Math.max(1, Math.round(nb / w));                       // ~1 px per bin
+  const series = [['lab', muted, 0.9], ['cry', steel, 1.2], ['trk', amber, 1.4]].filter(([k]) => hShow[k]);
+  const binned = {}; let ymax = 1;
+  for (const [k] of series) { const a = []; for (let i = 0; i < nb; i += reb) { let s = 0; for (let j = i; j < i + reb && j < nb; j++) s += H[k][j]; a.push(s); ymax = Math.max(ymax, s); } binned[k] = a; }
+  const Y = v => hLog ? (v > 0 ? Math.log10(v) / Math.log10(ymax * 1.5) : -1) : v / (ymax * 1.1);
+  g2.strokeStyle = muted; g2.globalAlpha = 0.35; g2.lineWidth = 1;
+  g2.beginPath(); g2.moveTo(padL, 6); g2.lineTo(padL, 6 + h); g2.lineTo(padL + w, 6 + h); g2.stroke();
+  g2.globalAlpha = 1; g2.fillStyle = muted; g2.font = '9px IBM Plex Mono, monospace'; g2.textBaseline = 'top'; g2.textAlign = 'center';
+  const step = xmax > 3000 ? 1000 : xmax > 1200 ? 500 : 200;
+  for (let e = 0; e <= xmax; e += step) g2.fillText(e, padL + e / xmax * w, 8 + h);
+  g2.textAlign = 'right'; g2.textBaseline = 'middle'; g2.fillText(hLog ? 'log' : 'lin', padL - 3, 10);
+  // expected lines
+  g2.setLineDash([2, 3]); g2.strokeStyle = ink; g2.globalAlpha = 0.25;
+  for (const L of P.lines) { if (L > xmax) continue; const x = padL + L / xmax * w; g2.beginPath(); g2.moveTo(x, 6); g2.lineTo(x, 6 + h); g2.stroke(); }
+  g2.setLineDash([]); g2.globalAlpha = 1;
+  for (const [k, c, lw] of series) {
+    g2.strokeStyle = c; g2.lineWidth = lw; g2.beginPath();
+    binned[k].forEach((v, i) => { const x = padL + i * reb / nb * w, y = 6 + h - Math.max(0, Y(v)) * h; i ? g2.lineTo(x, y) : g2.moveTo(x, y); g2.lineTo(x + reb / nb * w, y); });
+    g2.stroke();
+  }
+  $('specTitle').innerHTML = `Accumulated: ${H.n.toLocaleString()} events · ${P.src ? 'at rest' : `Doppler β = ${betaSel.toFixed(2)}`}`;
+  // efficiency table
+  const lines = (rxKey === 'band' ? [] : P.lines).filter(L => H.emitted.get(Math.round(L)) || H.emitted.get(Math.round(L) + 1) || H.emitted.get(Math.round(L) - 1));
+  const emit = L => H.emitted.get(Math.round(L)) || H.emitted.get(Math.round(L) + 1) || H.emitted.get(Math.round(L) - 1) || 0;
+  if (lines.length && H.n >= 20) {
+    $('effTab').innerHTML = `<tr><th>E₀ keV</th><th>ε trk</th><th>FWHM</th><th>ε cry</th><th>FWHM</th></tr>` + lines.map(L => {
+      const r = H.pk.get(L), a = peakStats(r.trk, L), c = peakStats(r.cry, L), n = emit(L);
+      return `<tr><td>${L}</td><td>${(100 * a.net / n).toFixed(1)}%</td><td>${a.fwhm.toFixed(1)}</td><td>${(100 * c.net / n).toFixed(1)}%</td><td>${c.fwhm.toFixed(1)}</td></tr>`;
+    }).join('');
+    $('specNote').textContent = `Full-energy peak efficiency per emitted γ: net counts in ±max(6 keV, ${(winRel * 100).toFixed(1)}%) over a side-band background; FWHM (keV) from the in-window spread. Tracked: cluster sum, 1st-point angle; crystal: one energy per crystal, crystal-centre angle.`;
+  } else { $('effTab').innerHTML = ''; $('specNote').textContent = rxKey === 'band' ? 'Amber: tracked & Doppler-corrected; steel: crystal-centre correction; grey: lab frame.' : 'Collecting… press “+1000 ev” to fill quickly.'; }
+}
+function runBatch(n) {
+  const t0 = performance.now();
+  for (let k = 0; k < n; k++) { const e = genEvent(rxKey, PRESETS[rxKey].src ? 0 : betaSel, bkgOn); respond(e); trackEvent(e); accumulate(e); }
+  drawSpec();
+  return performance.now() - t0;
+}
+
+/* ---------------- labels ---------------- */
+const mkLabel = (n, sub, p, cls = '') => {
+  const d = document.createElement('div'); d.className = 'lbl ' + cls;
+  d.innerHTML = `<b>${n}</b>${sub ? ' · ' + sub : ''}`;
+  $('labels').appendChild(d);
+  return { d, v: new THREE.Vector3(...p) };
+};
+const q0 = CRY.filter(c => c.ring === 0).sort((a, b) => MIDS[b.mod][1] - MIDS[a.mod][1])[0], qA = CRY.find(c => c.type === 0 && c.hemi === 0 && c.a[1] > 0.5), qB = CRY.find(c => c.type === 1 && c.hemi === 0 && c.a[1] > 0.4 && c.a[2] < 0);
+const LABELS = [
+  ['Target', '⁹Be', [0, -0.02, 0], 'inner'],
+  ['Pentagon', 'beam exit', [0, 0.05, RF], 'inner'],
+  ['Hemisphere', '15 quads', [0.31, -0.2, 0]],
+  ['Hemisphere', '15 quads', [-0.31, -0.2, 0]],
+  ['Type A', 'crystal', vscale(qA.a, RF + LEN), 'inner'],
+  ['Type B', 'crystal', vscale(qB.a, RF + LEN), 'inner'],
+  ['Quad module', '4 crystals', vscale(MIDS[q0.mod], RF + LEN + 0.02)],
+  ['Upstream', 'beam from ARIS', [0, PIPE_R + 0.005, -0.9]],
+  ['S800', 'quadrupole triplet', [0, 0.115, 1.2], 's800'],
+].map(([n, sub, p, k]) => ({ ...mkLabel(n, sub, p), inner: k === 'inner', s800: k === 's800' }));
+const ionLbl = mkLabel('', '', [0, 0, 0], 'ion');
+const pv = new THREE.Vector3();
+function placeLabels() {
+  const w = innerWidth, h = innerHeight, camD = camera.position.distanceTo(controls.target);
+  const all = [...LABELS, ionLbl];
+  for (const L of all) {
+    if (L.inner && camD > 1.0) { L.d.hidden = true; continue; }
+    if (L.s800 && !s800.visible) { L.d.hidden = true; continue; }
+    if (L === ionLbl && !ion.visible) { L.d.hidden = true; continue; }
+    pv.copy(L.v).project(camera);
+    const vis = pv.z < 1 && Math.abs(pv.x) < 1.05 && Math.abs(pv.y) < 1.05;
+    L.d.hidden = !vis;
+    if (vis) L.d.style.transform = `translate(${(pv.x * 0.5 + 0.5) * w}px,${(-pv.y * 0.5 + 0.5) * h}px) translate(-50%,-100%)`;
+  }
+}
+
+/* ---------------- ion motion ---------------- */
+function updateIon(t) {
+  const P = ev.P;
+  if (P.src) { ion.visible = false; trail.visible = false; srcMark.visible = true; return; }
+  srcMark.visible = false; ion.visible = true; trail.visible = true;
+  const bIn = ev.betaNom + (P.fast ? 0.02 : 0.002), bOut = ev.bEm;
+  const z = t < 0 ? ev.zr + bIn * CLIGHT * t : ev.zr + bOut * CLIGHT * t;
+  ion.position.set(0, 0, z); ion.scale.setScalar(0.0035);
+  const zs = ev.zr - bIn * CLIGHT * (ev.tPre + 0.15);
+  trailPos.set([0, 0, zs, 0, 0, Math.min(z, ev.zr), 0, 0, ev.zr, 0, 0, Math.max(z, ev.zr)]);
+  trailGeo.attributes.position.needsUpdate = true;
+  ionLbl.d.innerHTML = `<b>${P.nuc}</b> · β ${(t < 0 ? bIn : bOut).toFixed(2)}${t > 0 ? '*' : ''}`;
+  ionLbl.v.set(0, 0.012, z);
+}
+
+/* ---------------- camera presets ---------------- */
+const VIEWS = {
+  v3d: [[0.95, 0.55, -0.9], [0, 0, 0.05]], vBeam: [[0.0005, 0.0005, -1.25], [0, 0, 0]],
+  vSide: [[1.55, 0.12, 0.25], [0, 0, 0.25]], vIn: [[0.02, 0.045, -0.06], [0, 0, 0.14]],
+};
+let tween = null;
+function setView(id, instant) {
+  const k = innerWidth / innerHeight < 1 ? 1.6 : 1;
+  const [pos, tgt] = VIEWS[id];
+  const to = new THREE.Vector3(...pos).multiplyScalar(id === 'vIn' ? 1 : k), tt = new THREE.Vector3(...tgt);
+  for (const b of Object.keys(VIEWS)) $(b).setAttribute('aria-pressed', b === id);
+  if (id === 'vIn') { $('cCut').checked = false; uCut.value = 0; }
+  if (instant) { camera.position.copy(to); controls.target.copy(tt); return; }
+  tween = { from: camera.position.clone(), to, t: 0, tf: controls.target.clone(), tt };
+}
+
+/* ---------------- UI wiring ---------------- */
+let paused = false, speed = 1, autoLoop = true, phys = -1;
+$('iRx').innerHTML = Object.entries(PRESETS).map(([k, p]) => `<option value="${k}">${p.name}${p.src ? '' : ` · β ≈ ${p.beta.toFixed(2)}`}</option>`).join('');
+function rxChanged(keepBeta) {
+  const P = PRESETS[rxKey];
+  if (!keepBeta) { betaSel = P.beta; $('iBeta').value = betaSel; $('oBeta').textContent = betaSel.toFixed(2); }
+  $('gBeta').style.opacity = P.src ? 0.45 : 1; $('iBeta').disabled = !!P.src;
+  $('gMono').hidden = rxKey !== 'mono';
+  s800.visible = !!P.fast;
+  LABELS[7].d.querySelector('b').nextSibling.textContent = P.fast ? ' · beam from ARIS' : ' · ReA / source';
+  clearSpec();
+}
+$('iRx').onchange = e => { rxKey = e.target.value; rxChanged(); newEvent(); };
+$('iBeta').oninput = e => { betaSel = +e.target.value; $('oBeta').textContent = betaSel.toFixed(2); };
+$('iBeta').onchange = () => { clearSpec(); newEvent(); };
+$('iMono').onchange = e => { MONO = +e.target.value; PRESETS.mono.lines = [MONO]; clearSpec(); newEvent(); };
+$('iCfg').onchange = e => { nQuads = +e.target.value; setConfig(nQuads); applyConfig(); clearSpec(); newEvent(); };
+$('iColor').onchange = e => { colorMode = e.target.value; recolor(); };
+$('iShell').onchange = e => applyShellColours(e.target.value);
+$('hudToggle').onclick = () => { const c = $('hud').classList.toggle('collapsed'); $('hudToggle').setAttribute('aria-expanded', !c); };
+$('ctlToggle').onclick = () => { const c = $('controls').classList.toggle('collapsed'); $('ctlToggle').setAttribute('aria-expanded', !c); };
+$('bNext').onclick = newEvent;
+$('bReplay').onclick = replay;
+$('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? 'Play' : 'Pause'; $('bPause').setAttribute('aria-pressed', paused); };
+$('iSpeed').oninput = e => { speed = +e.target.value; $('oSpeed').textContent = speed.toFixed(1) + '×'; };
+$('cDet').onchange = e => { uDet.value = e.target.checked ? 1 : 0; };
+$('cCut').onchange = e => { uCut.value = e.target.checked ? 1 : 0; };
+$('cSegs').onchange = e => { uSegs.value = e.target.checked ? 1 : 0; };
+$('cBkg').onchange = e => { bkgOn = e.target.checked; clearSpec(); };
+$('cLbl').onchange = e => { $('labels').hidden = !e.target.checked; };
+$('cLoop').onchange = e => { autoLoop = e.target.checked; };
+$('cRot').onchange = e => { controls.autoRotate = e.target.checked; };
+for (const [id, k] of [['hTrk', 'trk'], ['hCry', 'cry'], ['hLab', 'lab']]) $(id).onclick = () => { hShow[k] = !hShow[k]; $(id).setAttribute('aria-pressed', hShow[k]); drawSpec(); };
+$('hLog').onclick = () => { hLog = !hLog; $('hLog').setAttribute('aria-pressed', hLog); drawSpec(); };
+$('hClr').onclick = () => { clearSpec(); drawSpec(); };
+$('hRun').onclick = () => { $('hRun').textContent = '…'; setTimeout(() => { runBatch(1000); $('hRun').textContent = '+1000 ev'; }, 20); };
+let lightTheme = false;
+function applyTheme(light) {
+  lightTheme = light;
+  document.documentElement.classList.toggle('light', light);
+  $('cLight').checked = light;
+  const bg = light ? 0xeef1f6 : 0x060a13;
+  renderer.setClearColor(bg, 1); scene.fog.color.setHex(bg);
+  uLight.value = light ? 1 : 0;
+  for (const m of themed) { m.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; m.needsUpdate = true; }
+  for (const m of lineMats) { m.color.copy(m.userData.base.color).multiplyScalar(light ? 0.55 : 1); m.opacity = Math.min(1, m.userData.base.opacity * (light ? 1.7 : 1)); }
+  drawSpec();
+}
+$('cLight').onchange = e => applyTheme(e.target.checked);
+for (const id of Object.keys(VIEWS)) $(id).onclick = () => setView(id);
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); $('bPause').click(); }
+  if (e.key === 'n') newEvent();
+});
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); drawSpec(); });
+// URL parameters (links / tests): ?rx=si42&beta=0.35&cfg=20&color=track&view=vIn&t=1.2&batch=2000&cut=1&light=1
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('rx') && PRESETS[q.get('rx')]) { rxKey = q.get('rx'); $('iRx').value = rxKey; }
+  rxChanged();
+  if (q.has('beta')) { betaSel = +q.get('beta'); $('iBeta').value = betaSel; $('oBeta').textContent = betaSel.toFixed(2); }
+  if (q.has('cfg')) { nQuads = +q.get('cfg') === 20 ? 20 : 30; $('iCfg').value = nQuads; setConfig(nQuads); applyConfig(); }
+  if (q.has('color')) { colorMode = q.get('color'); $('iColor').value = colorMode; }
+  if (q.has('shell')) { $('iShell').value = q.get('shell'); applyShellColours(q.get('shell')); }
+  if (q.has('cut')) { $('cCut').checked = true; uCut.value = 1; }
+  if (q.has('t')) { paused = true; autoLoop = false; controls.autoRotate = false; window.__fixT = +q.get('t'); }
+  if (q.has('view') && VIEWS[q.get('view')]) window.__view = q.get('view');
+  if (q.has('open')) { $('hud').classList.remove('collapsed'); $('controls').classList.remove('collapsed'); }
+  if (q.has('light')) applyTheme(true);
+  window.__batch = +q.get('batch') || 0;
+}
+
+/* ---------------- go ---------------- */
+setView(window.__view || 'v3d', true);
+newEvent();
+if (window.__batch) runBatch(window.__batch);
+if (window.__fixT !== undefined) phys = window.__fixT;
+const clock = new THREE.Clock();
+let shotReq = null;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!paused) {
+    // approach shown in ≈1.3 s whatever β; after the reaction 0.45 ns of physics per second at 1×
+    phys += dt * speed * (phys < 0 ? ev.tPre / 1.3 : 0.45);
+  }
+  if (autoLoop && !paused && phys > ev.tEnd + 1.2) newEvent();
+  uT.value = phys;
+  updateIon(phys);
+  phaseUpdate(phys);
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 0.9);
+    const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
+    camera.position.lerpVectors(tween.from, tween.to, e);
+    controls.target.lerpVectors(tween.tf, tween.tt, e);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+  if (!$('labels').hidden) placeLabels();
+  if (post && !lightTheme) post.render(); else renderer.render(scene, camera);
+  if (shotReq) { const r = shotReq; shotReq = null; composeShot(r); }
+});
+window.__ready = true;
+window.__dbg = { get ev() { return ev; }, H, runBatch, CRY };
+
+/* ---------------- screenshot ---------------- */
+let downloads = null;
+const inViewer = typeof window.claude?.use === 'function';
+$('bShot').hidden = false;
+if (inViewer) (async () => { try { downloads = await window.claude.use('downloads'); } catch (e) { downloads = null; } })();
+function saveLocally(blob, filename) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function composeShot(done) {
+  const src = renderer.domElement, c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const k = c.width / innerWidth, pad = 18 * k;
+  g.font = `600 ${22 * k}px 'Barlow Condensed', 'Arial Narrow', sans-serif`;
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue('--ink').trim(); g.textBaseline = 'bottom';
+  g.fillText(`GRETA @ FRIB · ${ev.P.name}${ev.P.src ? '' : ` · β = ${ev.betaNom.toFixed(2)}`} · toy MC`, pad, c.height - pad - 18 * k);
+  g.font = `400 ${12 * k}px 'IBM Plex Mono', monospace`; g.fillStyle = css.getPropertyValue('--muted').trim();
+  g.fillText(`Event #${String(evNo).padStart(3, '0')} · Mγ ${ev.gam.length} · ${ev.ints.length} interactions in ${ev.crys.size} crystals · tracked ${ev.clusters.filter(C => C.ok).map(C => fmtE(C.Edc)).join(', ')} keV`, pad, c.height - pad);
+  c.toBlob(done, 'image/png');
+}
+$('bShot').onclick = () => {
+  const b = $('bShot');
+  shotReq = async blob => {
+    if (!blob) { b.textContent = 'Screenshot failed'; return; }
+    const filename = `greta-${rxKey}-event-${String(evNo).padStart(3, '0')}.png`;
+    if (!downloads) {
+      if (inViewer) { b.textContent = 'Save unavailable'; setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return; }
+      saveLocally(blob, filename); b.textContent = 'Saved';
+      setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800); return;
+    }
+    try { await downloads.save({ filename, data: blob }); b.textContent = 'Saved'; }
+    catch (e) {
+      b.textContent = e?.code === 'declined' ? 'Save screenshot' : 'Save unavailable';
+      if (['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e?.code)) b.hidden = true;
+    }
+    setTimeout(() => { b.textContent = 'Save screenshot'; }, 1800);
+  };
+};
+
+function fail(msg) {
+  const d = document.createElement('div'); d.id = 'fail'; d.textContent = msg; app.prepend(d);
+  $('phaseName').textContent = 'Renderer unavailable'; $('phaseNote').textContent = msg;
+}
+</script>
+
+</body>
+</html>
